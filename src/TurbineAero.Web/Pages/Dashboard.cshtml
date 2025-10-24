@@ -1,0 +1,238 @@
+@page
+@model DashboardModel
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0">
+                <i class="fas fa-tachometer-alt me-2" style="color: #333333;"></i>Dashboard
+            </h1>
+            <div class="btn-group" role="group">
+                <button type="button" class="btn btn-outline-primary">
+                    <i class="fas fa-download me-2"></i>Export Data
+                </button>
+                <button type="button" class="btn btn-primary">
+                    <i class="fas fa-plus me-2"></i>Add Turbine
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Statistics Cards -->
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow h-100 py-2" style="border-left: 4px solid #333333;">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1" style="color: #333333;">
+                            Total Turbines</div>
+                        <div class="h5 mb-0 font-weight-bold">24</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-wind fa-2x" style="color: #cccccc;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow h-100 py-2" style="border-left: 4px solid #333333;">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1" style="color: #333333;">
+                            Active Turbines</div>
+                        <div class="h5 mb-0 font-weight-bold">22</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-check-circle fa-2x" style="color: #cccccc;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow h-100 py-2" style="border-left: 4px solid #333333;">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1" style="color: #333333;">
+                            Total Power Generated</div>
+                        <div class="h5 mb-0 font-weight-bold">2.4 MW</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-bolt fa-2x" style="color: #cccccc;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-xl-3 col-md-6 mb-4">
+        <div class="card shadow h-100 py-2" style="border-left: 4px solid #333333;">
+            <div class="card-body">
+                <div class="row no-gutters align-items-center">
+                    <div class="col mr-2">
+                        <div class="text-xs font-weight-bold text-uppercase mb-1" style="color: #333333;">
+                            Maintenance Due</div>
+                        <div class="h5 mb-0 font-weight-bold">3</div>
+                    </div>
+                    <div class="col-auto">
+                        <i class="fas fa-tools fa-2x" style="color: #cccccc;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Turbine Status Table -->
+    <div class="col-lg-8">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold" style="color: #333333;">Turbine Status</h6>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered" id="dataTable" width="100%" cellspacing="0">
+                        <thead>
+                            <tr>
+                                <th>Turbine ID</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                                <th>Power Output</th>
+                                <th>Last Maintenance</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>T001</td>
+                                <td>Wind Farm A</td>
+                                <td><span class="badge" style="background: #333333; color: white;">Active</span></td>
+                                <td>1.2 MW</td>
+                                <td>2024-01-15</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">View</button>
+                                    <button class="btn btn-sm btn-outline-warning">Maintain</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>T002</td>
+                                <td>Wind Farm A</td>
+                                <td><span class="badge" style="background: #333333; color: white;">Active</span></td>
+                                <td>1.1 MW</td>
+                                <td>2024-01-10</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">View</button>
+                                    <button class="btn btn-sm btn-outline-warning">Maintain</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td>T003</td>
+                                <td>Wind Farm B</td>
+                                <td><span class="badge" style="background: #666666; color: white;">Maintenance</span></td>
+                                <td>0 MW</td>
+                                <td>2024-01-20</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary">View</button>
+                                    <button class="btn btn-sm btn-outline-success">Complete</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="col-lg-4">
+        <div class="card shadow mb-4">
+            <div class="card-header py-3">
+                <h6 class="m-0 font-weight-bold" style="color: #333333;">Recent Activity</h6>
+            </div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item">
+                        <div class="timeline-marker" style="background: #333333;"></div>
+                        <div class="timeline-content">
+                            <h6 class="timeline-title">Turbine T001 Started</h6>
+                            <p class="timeline-text">Turbine T001 has been successfully started and is generating power.</p>
+                            <small class="text-muted">2 hours ago</small>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-marker" style="background: #666666;"></div>
+                        <div class="timeline-content">
+                            <h6 class="timeline-title">Maintenance Scheduled</h6>
+                            <p class="timeline-text">Maintenance scheduled for Turbine T003 on 2024-01-25.</p>
+                            <small class="text-muted">4 hours ago</small>
+                        </div>
+                    </div>
+                    <div class="timeline-item">
+                        <div class="timeline-marker" style="background: #333333;"></div>
+                        <div class="timeline-content">
+                            <h6 class="timeline-title">Performance Report</h6>
+                            <p class="timeline-text">Monthly performance report generated for all turbines.</p>
+                            <small class="text-muted">1 day ago</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .border-left-primary {
+        border-left: 0.25rem solid #333333 !important;
+    }
+    .border-left-success {
+        border-left: 0.25rem solid #333333 !important;
+    }
+    .border-left-info {
+        border-left: 0.25rem solid #333333 !important;
+    }
+    .border-left-warning {
+        border-left: 0.25rem solid #333333 !important;
+    }
+    .timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+    .timeline-item {
+        position: relative;
+        margin-bottom: 20px;
+    }
+    .timeline-marker {
+        position: absolute;
+        left: -35px;
+        top: 0;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+    }
+    .timeline-content {
+        background: #f8f9fa;
+        padding: 15px;
+        border-radius: 5px;
+        border-left: 3px solid #333333;
+    }
+    .timeline-title {
+        margin-bottom: 5px;
+        font-weight: 600;
+    }
+    .timeline-text {
+        margin-bottom: 5px;
+        color: #6c757d;
+    }
+</style>
