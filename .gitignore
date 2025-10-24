@@ -1,0 +1,67 @@
+# Visual Studio and .NET
+**/bin/
+**/obj/
+**/.vs/
+**/TestResults/
+**/artifacts/
+
+# User-specific files
+**/*.user
+**/*.suo
+**/*.userosscache
+**/*.sln.docstates
+
+# Rider / ReSharper
+**/.idea/
+**/.Rider*/
+**/*.DotSettings.user
+
+# VS Code
+**/.vscode/
+
+# NuGet
+**/packages/
+*.nupkg
+!**/build/
+
+# Logs & dumps
+**/*.log
+**/*.tlog
+**/*.dmp
+
+# Database files
+**/*.mdf
+**/*.ldf
+
+# Profiling
+**/*.psess
+**/*.vsp
+**/*.vspx
+
+# NCrunch
+**/*.ncrunch*.*
+**/_NCrunch_*
+**/.ncrunch*
+
+# Cache
+**/*.cache/
+
+# Launch settings
+**/launchSettings.json
+
+# PDBs
+**/*.pdb
+
+# Local settings & secrets
+**/*.local.json
+
+# Node
+**/node_modules/
+
+# EF Core migrations keep
+!**/Migrations/*.cs
+!**/Migrations/*.Designer.cs
+!**/Migrations/*Snapshot.cs
+
+# Coverage
+**/coverage/
