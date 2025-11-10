@@ -1,3 +1,8 @@
+dotnet-sdk-8.0.415-win-x64 (1).exe
+*.exe
+
+
+
 # Visual Studio and .NET
 **/bin/
 **/obj/
