@@ -1,0 +1,320 @@
+@page
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Mvc.RazorPages
+@attribute [Authorize]
+@{
+    ViewData["Title"] = "Setup Two-Factor Authentication";
+}
+
+<style>
+    #qrCodeContainer {
+        padding: 0;
+        margin: 0;
+        background: transparent;
+    }
+    
+    #qrCodeImage {
+        display: block !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        border: none !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        max-width: 280px;
+        width: auto;
+        height: auto;
+        object-fit: contain;
+    }
+</style>
+
+<div class="row justify-content-center">
+    <div class="col-md-11 col-lg-10 mt-5">
+        <div class="text-center mb-5">
+            <h2 class="h3">Setup Two-Factor Authentication</h2>
+            <p class="text-muted small">Secure your account with an extra layer of protection.</p>
+        </div>
+
+        <div id="setupContent" class="row g-4">
+            <div class="col-md-6">
+                <div class="text-center">
+                <p class="text-muted mb-3">Scan with Google Authenticator or Microsoft Authenticator</p>
+                <div id="qrCodeContainer" class="d-flex justify-content-center align-items-center" style="min-height: 250px;">
+                    <div class="spinner-border text-primary" role="status" id="qrCodeSpinner">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                        <img id="qrCodeImage" src="" alt="Authenticator QR Code" class="d-none" />
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <h5 class="h6 mb-2">Step 1: Scan QR Code</h5>
+                <p class="text-muted small mb-2">Open your authenticator app and scan the QR code shown on the left.</p>
+                
+                <h5 class="h6 mb-2 mt-3">Step 2: Save Your Backup Key</h5>
+                <p class="text-muted small mb-2">Keep this key safe. You'll need it if you lose access to your authenticator app.</p>
+                <div class="d-flex align-items-center justify-content-between bg-light p-2 rounded mb-2">
+                    <code id="secretKey" class="fw-bold small"></code>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" id="copySecretBtn">
+                        <i class="fas fa-copy me-1"></i>Copy
+                    </button>
+                </div>
+
+                <h5 class="h6 mb-2 mt-3">Step 3: Verify Setup</h5>
+                <p class="text-muted small mb-2">Enter the 6-digit code from your authenticator app to complete setup.</p>
+                <div class="mb-2">
+                    <label for="verificationCode" class="form-label small">Verification Code</label>
+                    <div class="d-flex gap-2 align-items-end">
+                        <div class="flex-grow-1">
+                            <input type="text" id="verificationCode" class="form-control text-center" 
+                                   maxlength="6" placeholder="000000" autocomplete="one-time-code" 
+                                   style="font-size: 1.25rem; letter-spacing: 0.5rem;" />
+                        </div>
+                        <button type="button" class="btn btn-primary btn-lg" id="verifyBtn" disabled>
+                            Verify & Enable 2FA
+                        </button>
+                    </div>
+                    <div id="verificationFeedback" class="mt-1 small"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="successContent" class="text-center d-none">
+            <div class="mb-4">
+                <i class="fas fa-check-circle text-primary" style="font-size: 4rem;"></i>
+            </div>
+            <h3 class="mb-3">Two-Factor Authentication Enabled!</h3>
+            <p class="text-muted mb-4">Your account is now secured with 2FA. You'll be asked for a verification code each time you sign in.</p>
+            <a href="/Dashboard" class="btn btn-primary btn-lg">
+                <i class="fas fa-arrow-right me-2"></i>Go to Dashboard
+            </a>
+        </div>
+
+        <div id="errorContent" class="alert alert-danger d-none" role="alert">
+            <i class="fas fa-exclamation-circle me-2"></i>
+            <span id="errorMessage"></span>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const qrCodeContainer = document.getElementById('qrCodeContainer');
+            const qrCodeSpinner = document.getElementById('qrCodeSpinner');
+            const qrCodeImage = document.getElementById('qrCodeImage');
+            const secretKey = document.getElementById('secretKey');
+            const copySecretBtn = document.getElementById('copySecretBtn');
+            const verificationCode = document.getElementById('verificationCode');
+            const verificationFeedback = document.getElementById('verificationFeedback');
+            const verifyBtn = document.getElementById('verifyBtn');
+            const setupContent = document.getElementById('setupContent');
+            const successContent = document.getElementById('successContent');
+            const errorContent = document.getElementById('errorContent');
+            const errorMessage = document.getElementById('errorMessage');
+
+            let setupData = null;
+
+            // Auto-generate QR code on page load
+            const generateQRCode = async () => {
+                try {
+                    console.log('Starting QR code generation...');
+                    const response = await fetch('/api/account/enable-2fa', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include'
+                    });
+
+                    console.log('API response status:', response.status);
+                    
+                    // Check for authentication errors first
+                    if (response.status === 401 || response.status === 403) {
+                        console.error('Authentication error:', response.status);
+                        throw new Error('Your session has expired. Please log in again and try setting up 2FA.');
+                    }
+                    
+                    // Read response as text first to check content
+                    const text = await response.text();
+                    
+                    // Check if response is empty
+                    if (!text || text.trim() === '') {
+                        console.error('Empty response from server, status:', response.status);
+                        if (response.status >= 400) {
+                            throw new Error('Authentication failed. Please refresh the page and try again.');
+                        }
+                        throw new Error('Server returned an empty response. Please try again.');
+                    }
+                    
+                    // Check content type
+                    const contentType = response.headers.get('content-type');
+                    if (!contentType || !contentType.includes('application/json')) {
+                        console.error('Non-JSON response:', text.substring(0, 200));
+                        throw new Error('Server returned an invalid response. Please try again.');
+                    }
+                    
+                    // Parse JSON
+                    let result;
+                    try {
+                        result = JSON.parse(text);
+                    } catch (parseError) {
+                        console.error('JSON parse error:', parseError, 'Response text:', text.substring(0, 200));
+                        throw new Error('Server returned invalid JSON. Please try again.');
+                    }
+                    
+                    console.log('API response data:', result);
+                    
+                    if (response.ok && result.success) {
+                        setupData = result.data;
+                        console.log('Setup data received:', setupData);
+                        
+                        // Display secret key first
+                        if (setupData.secretKey) {
+                            secretKey.textContent = setupData.secretKey;
+                            console.log('Secret key displayed');
+                        } else {
+                            console.warn('Secret key not provided in response');
+                        }
+                        
+                        if (setupData.qrCodeUri || setupData.qrCodeImageUrl) {
+                            console.log('QR code data received');
+                            // Use server-side generated QR code image URL (bypasses ad blockers)
+                            const qrCodeUrl = setupData.qrCodeImageUrl || `/api/account/qrcode?uri=${encodeURIComponent(setupData.qrCodeUri)}`;
+                            console.log('Loading QR code from:', qrCodeUrl);
+                            
+                            qrCodeImage.src = qrCodeUrl;
+                            qrCodeImage.onload = () => {
+                                console.log('QR code loaded successfully');
+                                qrCodeSpinner.classList.add('d-none');
+                                qrCodeImage.classList.remove('d-none');
+                            };
+                            qrCodeImage.onerror = () => {
+                                console.error('QR code image failed to load');
+                                qrCodeSpinner.classList.add('d-none');
+                                errorContent.classList.remove('d-none');
+                                errorMessage.textContent = 'Failed to load QR code. The backup key is displayed above - you can manually enter it into your authenticator app.';
+                            };
+                        } else {
+                            console.error('QR code URI not provided in response');
+                            throw new Error('QR code URI not provided');
+                        }
+                    } else {
+                        console.error('API call failed:', result);
+                        throw new Error(result.message || 'Failed to generate QR code');
+                    }
+                } catch (error) {
+                    console.error('Error generating QR code:', error);
+                    qrCodeSpinner.classList.add('d-none');
+                    errorContent.classList.remove('d-none');
+                    errorMessage.textContent = error.message || 'An error occurred while setting up 2FA. Please try again.';
+                }
+            };
+
+            // Start QR code generation
+            generateQRCode();
+
+            // Copy secret key
+            copySecretBtn.addEventListener('click', () => {
+                if (secretKey.textContent) {
+                    navigator.clipboard.writeText(secretKey.textContent.replace(/\s/g, '')).then(() => {
+                        const originalText = copySecretBtn.innerHTML;
+                        copySecretBtn.innerHTML = '<i class="fas fa-check me-1"></i>Copied!';
+                        setTimeout(() => {
+                            copySecretBtn.innerHTML = originalText;
+                        }, 2000);
+                    });
+                }
+            });
+
+            // Enable verify button when code is entered
+            verificationCode.addEventListener('input', () => {
+                const code = verificationCode.value.trim().replace(/\s/g, '');
+                verifyBtn.disabled = code.length !== 6;
+            });
+
+            // Verify 2FA code
+            verifyBtn.addEventListener('click', async () => {
+                const code = verificationCode.value.trim().replace(/\s/g, '').replace(/-/g, '');
+                
+                if (code.length !== 6) {
+                    verificationFeedback.textContent = 'Please enter a 6-digit code.';
+                    verificationFeedback.classList.remove('text-success', 'text-muted');
+                    verificationFeedback.classList.add('text-danger');
+                    verificationFeedback.classList.remove('d-none');
+                    return;
+                }
+
+                verifyBtn.disabled = true;
+                verificationFeedback.textContent = 'Verifying...';
+                verificationFeedback.classList.remove('text-success', 'text-muted');
+                verificationFeedback.classList.add('text-muted');
+                verificationFeedback.classList.remove('d-none');
+
+                try {
+                    const response = await fetch('/api/account/verify-2fa', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        credentials: 'include',
+                        body: JSON.stringify({ code })
+                    });
+
+                    // Read response as text first to check content
+                    const text = await response.text();
+                    
+                    // Check if response is empty
+                    if (!text || text.trim() === '') {
+                        verificationFeedback.textContent = 'Server returned an empty response. Please try again.';
+                        verificationFeedback.classList.remove('text-success', 'text-muted');
+                        verificationFeedback.classList.add('text-danger');
+                        verifyBtn.disabled = false;
+                        return;
+                    }
+                    
+                    // Parse JSON
+                    let result;
+                    try {
+                        result = JSON.parse(text);
+                    } catch (parseError) {
+                        console.error('JSON parse error:', parseError, 'Response text:', text.substring(0, 200));
+                        verificationFeedback.textContent = 'Server returned an invalid response. Please try again.';
+                        verificationFeedback.classList.remove('text-success', 'text-muted');
+                        verificationFeedback.classList.add('text-danger');
+                        verifyBtn.disabled = false;
+                        return;
+                    }
+                    
+                    if (response.ok && result.success) {
+                        // Show success prompt and redirect to dashboard
+                        try { if (typeof showToast === 'function') { showToast('Two-factor authentication enabled.', 'success'); } } catch {}
+                        setTimeout(() => { window.location.href = '/Dashboard'; }, 700);
+                    } else {
+                        verificationFeedback.textContent = result.message || 'Invalid code. Please try again.';
+                        verificationFeedback.classList.remove('text-success', 'text-muted');
+                        verificationFeedback.classList.add('text-danger');
+                        verifyBtn.disabled = false;
+                    }
+                } catch (error) {
+                    verificationFeedback.textContent = 'An error occurred during verification. Please try again.';
+                    verificationFeedback.classList.remove('text-success', 'text-muted');
+                    verificationFeedback.classList.add('text-danger');
+                    verifyBtn.disabled = false;
+                }
+            });
+
+            // Auto-focus verification code input
+            verificationCode.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                const cleaned = pastedText.replace(/\s/g, '').replace(/-/g, '').slice(0, 6);
+                verificationCode.value = cleaned;
+                verifyBtn.disabled = cleaned.length !== 6;
+            });
+
+            // Generate QR code on page load
+            generateQRCode();
+        });
+    </script>
+}

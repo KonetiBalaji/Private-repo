@@ -17,11 +17,8 @@ public class RegisterRequest
     public string Email { get; set; } = string.Empty;
 
     [Required]
-    [Phone]
-    public string Phone { get; set; } = string.Empty;
-
-    [Required]
-    [StringLength(100, MinimumLength = 6)]
+    [StringLength(12, MinimumLength = 8)]
+    [RegularExpression(@"^(?=.*[A-Za-z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,12}$", ErrorMessage = "Password must be 8-12 characters long and include letters, numbers, and special characters.")]
     public string Password { get; set; } = string.Empty;
 
     [Required]

@@ -22,9 +22,8 @@ public class OtpService : IOtpService
 
     public async Task<string> GenerateOtpAsync(string identifier, OtpType type)
     {
-        // Generate 6-digit OTP
-        var random = new Random();
-        var otp = random.Next(100000, 999999).ToString();
+        // Generate cryptographically secure 6-digit OTP
+        var otp = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
 
         // Hash the OTP
         var otpHash = HashOtp(otp);

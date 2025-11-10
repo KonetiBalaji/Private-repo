@@ -1,227 +1,564 @@
 @page
 @model RegisterModel
+@inject IConfiguration Configuration
 @{
     ViewData["Title"] = "Register";
 }
 
+<style>
+    .password-guidelines {
+        border: 1px solid #dadde1;
+        border-radius: 8px;
+        background: #ffffff;
+        padding: 12px 16px;
+        margin-top: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+        transition: all 0.25s ease;
+    }
+
+    .password-guidelines.guideline-success {
+        border-color: #31a24c;
+        background: #e8f5ed;
+        box-shadow: 0 6px 18px rgba(49, 162, 76, 0.25);
+    }
+
+    .password-guidelines .rule {
+        font-size: 0.92rem;
+        margin-bottom: 6px;
+        transition: color 0.3s ease;
+    }
+
+    .password-guidelines .rule:last-child {
+        margin-bottom: 0;
+    }
+
+    .password-section {
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        transform: translateY(0);
+    }
+
+    .password-section.hidden {
+        opacity: 0;
+        transform: translateY(-10px);
+        height: 0;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    .otp-section {
+        transition: opacity 0.3s ease, transform 0.3s ease;
+        transform: translateY(0);
+    }
+
+    .otp-section.hidden {
+        opacity: 0;
+        transform: translateY(-10px);
+        height: 0;
+        margin: 0 !important;
+        padding: 0 !important;
+        pointer-events: none;
+        overflow: hidden;
+    }
+
+    #validateEmailBtn {
+        transition: opacity 0.3s ease, visibility 0.3s ease;
+    }
+
+    #validateEmailBtn.hidden {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+    }
+</style>
+
 <div class="row justify-content-center">
-    <div class="col-md-8">
+    <div class="col-md-8 col-lg-6 mt-5">
         <div class="text-center mb-4">
-            <i class="fas fa-user-plus fa-3x mb-3" style="color: #333333;"></i>
             <h2>Create Account</h2>
             <p class="text-muted">Join TurbineAero and start managing your turbines today.</p>
         </div>
 
         <form id="registerForm" method="post">
+            @Html.AntiForgeryToken()
             <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
-            
+
             <div class="row">
                 <div class="col-md-6 mb-3">
-                    <label asp-for="Input.FirstName" class="form-label">First Name</label>
+                    <label asp-for="Input.FirstName" class="form-label"></label>
                     <input asp-for="Input.FirstName" class="form-control" autocomplete="given-name" />
-                    <span asp-validation-for="Input.FirstName" class="text-danger"></span>
+                    <span asp-validation-for="Input.FirstName" class="text-danger small"></span>
                 </div>
                 <div class="col-md-6 mb-3">
-                    <label asp-for="Input.LastName" class="form-label">Last Name</label>
+                    <label asp-for="Input.LastName" class="form-label"></label>
                     <input asp-for="Input.LastName" class="form-control" autocomplete="family-name" />
-                    <span asp-validation-for="Input.LastName" class="text-danger"></span>
+                    <span asp-validation-for="Input.LastName" class="text-danger small"></span>
                 </div>
             </div>
-            
+
             <div class="mb-3">
-                <label asp-for="Input.Email" class="form-label">Email</label>
-                <input asp-for="Input.Email" class="form-control" autocomplete="email" />
-                <span asp-validation-for="Input.Email" class="text-danger"></span>
+                <label asp-for="Input.Email" class="form-label"></label>
+                <div class="input-group">
+                    <input asp-for="Input.Email" class="form-control" autocomplete="email" id="EmailField" />
+                    <button type="button" id="validateEmailBtn" class="btn btn-outline-primary hidden">Validate Email</button>
+                </div>
+                <small id="emailStatus" class="form-text small d-none"></small>
+                <span asp-validation-for="Input.Email" class="text-danger small"></span>
             </div>
-            
+
+            <div id="otpSection" class="otp-section mb-3 hidden">
+                <label for="emailOtp" class="form-label">Enter OTP</label>
+                <div class="input-group">
+                    <input type="text" id="emailOtp" class="form-control" maxlength="6" placeholder="Enter 6-digit code" />
+                    <button type="button" id="verifyOtpBtn" class="btn btn-outline-primary">Verify OTP</button>
+                </div>
+                <small id="otpStatus" class="form-text small d-none"></small>
+            </div>
+
+            <div id="passwordSection" class="password-section mb-3 hidden">
             <div class="mb-3">
-                <label asp-for="Input.Phone" class="form-label">Phone Number</label>
-                <input asp-for="Input.Phone" class="form-control" autocomplete="tel" />
-                <span asp-validation-for="Input.Phone" class="text-danger"></span>
+                <label asp-for="Input.Password" class="form-label"></label>
+                    <input asp-for="Input.Password" class="form-control" autocomplete="new-password" id="Input_Password" />
+                <div id="passwordGuidelines" class="password-guidelines d-none">
+                        <div id="ruleLength" class="rule text-danger">• Must be 8-12 characters long</div>
+                    <div id="ruleLetters" class="rule text-danger">• Must include letters</div>
+                    <div id="ruleNumbers" class="rule text-danger">• Must include numbers</div>
+                    <div id="ruleSpecial" class="rule text-danger">• Must include special characters</div>
+                </div>
+                <span asp-validation-for="Input.Password" class="text-danger small d-block"></span>
             </div>
-            
-            <div class="mb-3">
-                <label asp-for="Input.Password" class="form-label">Password</label>
-                <input asp-for="Input.Password" class="form-control" autocomplete="new-password" />
-                <span asp-validation-for="Input.Password" class="text-danger"></span>
+
+            <div class="mb-4">
+                <label asp-for="Input.ConfirmPassword" class="form-label"></label>
+                    <input asp-for="Input.ConfirmPassword" class="form-control" autocomplete="new-password" id="Input_ConfirmPassword" />
+                <small id="confirmHint" class="form-text small d-none"></small>
+                <span asp-validation-for="Input.ConfirmPassword" class="text-danger small"></span>
+                </div>
             </div>
-            
-            <div class="mb-3">
-                <label asp-for="Input.ConfirmPassword" class="form-label">Confirm Password</label>
-                <input asp-for="Input.ConfirmPassword" class="form-control" autocomplete="new-password" />
-                <span asp-validation-for="Input.ConfirmPassword" class="text-danger"></span>
-            </div>
-            
+
             <div class="d-grid">
-                <button id="register-submit" type="submit" class="btn btn-primary btn-lg">
-                    <i class="fas fa-user-plus me-2"></i>Create Account
-                </button>
+                <button type="submit" class="btn btn-primary btn-lg" id="registerSubmitBtn" disabled>Create Account</button>
             </div>
         </form>
 
         <div class="text-center mt-4">
             <p>
-                Already have an account? <a asp-page="./Login" asp-route-returnUrl="@Model.ReturnUrl">Sign in here</a>
+                Already have an account? <a href="/">Sign in here</a>
             </p>
         </div>
     </div>
 </div>
 
-<!-- OTP Verification Modal -->
-<div class="modal fade" id="otpModal" tabindex="-1" aria-labelledby="otpModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="otpModalLabel">
-                    <i class="fas fa-shield-alt me-2" style="color: #333333;"></i>Verify Your Account
-                </h5>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted">We've sent verification codes to your email and phone number. Please enter both codes below.</p>
-                
-                <form id="otpForm">
-                    <div class="mb-3">
-                        <label for="emailOtp" class="form-label">Email Verification Code</label>
-                        <input type="text" id="emailOtp" class="form-control text-center" maxlength="6" placeholder="000000" />
-                    </div>
-                    
-                    <div class="mb-3">
-                        <label for="phoneOtp" class="form-label">Phone Verification Code</label>
-                        <input type="text" id="phoneOtp" class="form-control text-center" maxlength="6" placeholder="000000" />
-                    </div>
-                    
-                    <div class="text-center">
-                        <button type="button" id="resendOtpBtn" class="btn btn-outline-secondary">
-                            <i class="fas fa-redo me-2"></i>Resend Codes
-                        </button>
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="verifyOtpBtn" class="btn btn-primary">
-                    <i class="fas fa-check me-2"></i>Verify & Complete Registration
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
 
 @section Scripts {
     <partial name="_ValidationScriptsPartial" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script>
-        let userEmail = '';
-        let userPhone = '';
-
-        // Handle registration form submission
-        document.getElementById('registerForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        document.addEventListener('DOMContentLoaded', () => {
+            // Constants
+            const API_BASE_URL = '@(Configuration["App:ApiBaseUrl"] ?? string.Empty)';
             
-            const formData = new FormData(this);
-            // Map Razor input names (Input.*) to API DTO property names
-            const data = {
-                firstName: formData.get('Input.FirstName'),
-                lastName: formData.get('Input.LastName'),
-                email: formData.get('Input.Email'),
-                phone: formData.get('Input.Phone'),
-                password: formData.get('Input.Password'),
-                confirmPassword: formData.get('Input.ConfirmPassword')
+            // Toast utility function
+            const showToast = (message, type = 'success') => {
+                const toastHtml = `
+                    <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : 'danger'} border-0" role="alert" style="min-width: 300px;">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                ${message}
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                        </div>
+                    </div>
+                `;
+
+                let toastContainer = document.getElementById('toast-container');
+                if (!toastContainer) {
+                    toastContainer = document.createElement('div');
+                    toastContainer.id = 'toast-container';
+                    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                    toastContainer.style.zIndex = '9999';
+                    document.body.appendChild(toastContainer);
+                }
+
+                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+                const toastElement = toastContainer.lastElementChild;
+                const toast = new bootstrap.Toast(toastElement, {
+                    autohide: true,
+                    delay: 3000
+                });
+                toast.show();
+
+                toastElement.addEventListener('hidden.bs.toast', () => {
+                    toastElement.remove();
+                });
             };
-            
-            try {
-                const response = await fetch('https://localhost:7003/api/auth/register', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data),
-                    credentials: 'include'
-                });
-                
-                const result = await response.json();
 
-                if (result.success) {
-                    userEmail = data.email;
-                    userPhone = data.phone;
-                    showToast('Registration successful! Please verify your email and phone number.', 'success');
-                    $('#otpModal').modal('show');
+            // DOM elements
+            const form = document.getElementById('registerForm');
+            const passwordInput = document.getElementById('Input_Password');
+            const confirmInput = document.getElementById('Input_ConfirmPassword');
+            const confirmHint = document.getElementById('confirmHint');
+            const guidelinesBox = document.getElementById('passwordGuidelines');
+            const ruleLength = document.getElementById('ruleLength');
+            const ruleLetters = document.getElementById('ruleLetters');
+            const ruleNumbers = document.getElementById('ruleNumbers');
+            const ruleSpecial = document.getElementById('ruleSpecial');
+            const emailField = document.getElementById('EmailField');
+            const validateEmailBtn = document.getElementById('validateEmailBtn');
+            const emailStatus = document.getElementById('emailStatus');
+            const otpSection = document.getElementById('otpSection');
+            const otpInput = document.getElementById('emailOtp');
+            const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+            const otpStatus = document.getElementById('otpStatus');
+            const submitBtn = document.getElementById('registerSubmitBtn');
+            const passwordSection = document.getElementById('passwordSection');
+
+            // Regex patterns
+            const emailRegex = /^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/;
+            const letterRegex = /[A-Za-z]/;
+            const numberRegex = /\d/;
+            const specialRegex = /[^A-Za-z0-9]/;
+
+            // State variables
+            let guidelineHideTimeout;
+            let confirmHideTimeout;
+            let passwordSetToastShown = false;
+            let emailVerified = false;
+            let lastValidatedEmail = '';
+            let passwordValid = false;
+            let confirmValid = false;
+
+            // Email validation
+            const isValidEmail = (email) => {
+                return emailRegex.test(email.trim());
+            };
+
+            // Show/hide Validate Email button
+            const updateValidateEmailButton = () => {
+                const email = emailField.value.trim();
+                if (isValidEmail(email) && !emailVerified) {
+                    validateEmailBtn.classList.remove('hidden');
                 } else {
-                    let details = '';
-                    if (Array.isArray(result.errors) && result.errors.length) {
-                        details = `: ${result.errors.join(', ')}`;
-                    } else if (result.errors && typeof result.errors === 'object') {
-                        const flat = Object.values(result.errors).flat();
-                        if (flat.length) details = `: ${flat.join(', ')}`;
+                    validateEmailBtn.classList.add('hidden');
+                }
+            };
+
+            // Refresh submit button state
+            const refreshSubmitState = () => {
+                submitBtn.disabled = !(emailVerified && passwordValid && confirmValid);
+            };
+
+            // Set rule state (red/green)
+            const setRuleState = (element, satisfied) => {
+                element.classList.toggle('text-success', satisfied);
+                element.classList.toggle('text-danger', !satisfied);
+            };
+
+            // Hide password guidelines
+            const hideGuidelines = (resetRules = false) => {
+                guidelinesBox.classList.add('d-none');
+                guidelinesBox.classList.remove('guideline-success');
+                if (resetRules) {
+                    [ruleLength, ruleLetters, ruleNumbers, ruleSpecial].forEach(rule => {
+                        rule.classList.remove('text-success');
+                        rule.classList.add('text-danger');
+                    });
+                }
+            };
+
+            // Update password guidelines
+            const updatePasswordGuidelines = () => {
+                const value = passwordInput.value;
+                clearTimeout(guidelineHideTimeout);
+
+                if (!value) {
+                    hideGuidelines(true);
+                    passwordValid = false;
+                    passwordSetToastShown = false;
+                    refreshSubmitState();
+                    return false;
+                }
+
+                const hasLength = value.length >= 8 && value.length <= 12;
+                const hasLetters = letterRegex.test(value);
+                const hasNumbers = numberRegex.test(value);
+                const hasSpecial = specialRegex.test(value);
+
+                setRuleState(ruleLength, hasLength);
+                setRuleState(ruleLetters, hasLetters);
+                setRuleState(ruleNumbers, hasNumbers);
+                setRuleState(ruleSpecial, hasSpecial);
+
+                passwordValid = hasLength && hasLetters && hasNumbers && hasSpecial;
+
+                    guidelinesBox.classList.remove('d-none');
+
+                if (passwordValid) {
+                    guidelinesBox.classList.add('guideline-success');
+                    guidelineHideTimeout = setTimeout(() => {
+                        hideGuidelines();
+                    }, 900);
+                } else {
+                    guidelinesBox.classList.remove('guideline-success');
+                }
+
+                if (confirmInput.value) {
+                    updateConfirmHint();
+                }
+
+                refreshSubmitState();
+                return passwordValid;
+            };
+
+            // Update confirm password hint
+            const updateConfirmHint = () => {
+                clearTimeout(confirmHideTimeout);
+
+                const password = passwordInput.value;
+                const confirm = confirmInput.value;
+
+                if (!confirm) {
+                    confirmHint.textContent = '';
+                    confirmHint.classList.remove('text-success', 'text-danger');
+                    confirmHint.classList.add('d-none');
+                    confirmValid = false;
+                    refreshSubmitState();
+                    checkPasswordSetSuccess();
+                    return false;
+                }
+
+                confirmValid = password && confirm === password;
+                confirmHint.textContent = confirmValid ? 'Passwords match.' : 'Passwords do not match.';
+                confirmHint.classList.toggle('text-success', confirmValid);
+                confirmHint.classList.toggle('text-danger', !confirmValid);
+                confirmHint.classList.remove('d-none');
+
+                if (confirmValid) {
+                    confirmHideTimeout = setTimeout(() => {
+                        confirmHint.classList.add('d-none');
+                        confirmHint.classList.remove('text-success', 'text-danger');
+                    }, 900);
+                }
+
+                refreshSubmitState();
+                checkPasswordSetSuccess();
+                return confirmValid;
+            };
+
+            // Check if password is set successfully and show toast
+            const checkPasswordSetSuccess = () => {
+                if (passwordValid && confirmValid && !passwordSetToastShown) {
+                    passwordSetToastShown = true;
+                    showToast('Password set successfully!', 'success');
+                } else if (!passwordValid || !confirmValid) {
+                    passwordSetToastShown = false;
+                }
+            };
+
+            // Show/hide password section
+            const showPasswordSection = () => {
+                passwordSection.classList.remove('hidden');
+                setTimeout(() => {
+                    passwordInput.focus();
+                }, 300);
+            };
+
+            const hidePasswordSection = () => {
+                passwordSection.classList.add('hidden');
+                passwordInput.value = '';
+                confirmInput.value = '';
+                passwordValid = false;
+                confirmValid = false;
+                passwordSetToastShown = false;
+                hideGuidelines(true);
+                refreshSubmitState();
+            };
+
+            // Show/hide OTP section
+            const showOtpSection = () => {
+                otpSection.classList.remove('hidden');
+                setTimeout(() => {
+                    otpInput.focus();
+                }, 300);
+            };
+
+            const hideOtpSection = () => {
+                otpSection.classList.add('hidden');
+                otpInput.value = '';
+            };
+
+            // Set email status
+            const setEmailStatus = (message, status) => {
+                emailStatus.textContent = message;
+                emailStatus.classList.remove('text-success', 'text-danger', 'text-muted');
+                if (status === 'success') {
+                    emailStatus.classList.add('text-success');
+                } else if (status === 'error') {
+                    emailStatus.classList.add('text-danger');
+                } else {
+                    emailStatus.classList.add('text-muted');
+                }
+                emailStatus.classList.remove('d-none');
+            };
+
+            // Set OTP status
+            const setOtpStatus = (message, status) => {
+                otpStatus.textContent = message;
+                otpStatus.classList.remove('text-success', 'text-danger', 'text-muted');
+                if (status === 'success') {
+                    otpStatus.classList.add('text-success');
+                } else if (status === 'error') {
+                    otpStatus.classList.add('text-danger');
+                } else {
+                    otpStatus.classList.add('text-muted');
+                }
+                otpStatus.classList.remove('d-none');
+            };
+
+            // Event listeners
+            emailField.addEventListener('input', () => {
+                const current = emailField.value.trim().toLowerCase();
+                updateValidateEmailButton();
+                
+                if (emailVerified && current !== lastValidatedEmail) {
+                    emailVerified = false;
+                    hidePasswordSection();
+                    hideOtpSection();
+                    refreshSubmitState();
+                    emailStatus.classList.add('d-none');
+                }
+            });
+
+            passwordInput.addEventListener('input', updatePasswordGuidelines);
+            confirmInput.addEventListener('input', updateConfirmHint);
+
+            // Validate Email button click
+            validateEmailBtn.addEventListener('click', async () => {
+                const email = emailField.value.trim().toLowerCase();
+                emailField.value = email;
+
+                emailStatus.classList.add('d-none');
+                hideOtpSection();
+                otpInput.value = '';
+                emailVerified = false;
+                hidePasswordSection();
+                refreshSubmitState();
+
+                if (!email) {
+                    setEmailStatus('Please enter an email address.', 'error');
+                    return;
+                }
+
+                if (!isValidEmail(email)) {
+                    setEmailStatus('Please enter a valid email address.', 'error');
+                    return;
+                }
+
+                validateEmailBtn.disabled = true;
+                setEmailStatus('Sending OTP...', 'info');
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/auth/register/send-email-otp`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email }),
+                        credentials: 'include'
+                    });
+
+                    const result = await response.json();
+                    if (response.ok && result.success) {
+                        showToast('OTP sent successfully!', 'success');
+                        setEmailStatus('OTP sent to your email. Please check and enter below.', 'success');
+                        showOtpSection();
+                        lastValidatedEmail = email;
+                    } else {
+                        const errorMsg = result.message || (result.errors && result.errors.join(', ')) || 'Failed to send OTP. Please try again.';
+                        setEmailStatus(errorMsg, 'error');
+                        showToast(errorMsg, 'error');
                     }
-                    showToast((result.message || 'Registration failed') + details, 'error');
+                } catch (error) {
+                    setEmailStatus('An error occurred while sending OTP.', 'error');
+                    showToast('An error occurred while sending OTP.', 'error');
+                } finally {
+                    validateEmailBtn.disabled = false;
                 }
-            } catch (error) {
-                showToast('An error occurred during registration', 'error');
-            }
-        });
+            });
 
-        // Handle OTP verification
-        document.getElementById('verifyOtpBtn').addEventListener('click', async function() {
-            const emailOtp = document.getElementById('emailOtp').value;
-            const phoneOtp = document.getElementById('phoneOtp').value;
-            
-            if (!emailOtp || !phoneOtp) {
-                showToast('Please enter both verification codes', 'error');
-                return;
-            }
-            
-            try {
-                const response = await fetch('https://localhost:7003/api/auth/verify-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: userEmail,
-                        emailOtp: emailOtp,
-                        phoneOtp: phoneOtp
-                    }),
-                    credentials: 'include'
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToast('Account verified successfully! You can now sign in.', 'success');
-                    $('#otpModal').modal('hide');
-                    window.location.href = '/Account/Login';
-                } else {
-                    showToast(result.message || 'Verification failed', 'error');
-                }
-            } catch (error) {
-                showToast('An error occurred during verification', 'error');
-            }
-        });
+            // Verify OTP button click
+            verifyOtpBtn.addEventListener('click', async () => {
+                const email = emailField.value.trim().toLowerCase();
+                const otp = otpInput.value.trim();
+                otpStatus.classList.add('d-none');
 
-        // Handle resend OTP
-        document.getElementById('resendOtpBtn').addEventListener('click', async function() {
-            try {
-                const response = await fetch('https://localhost:7003/api/auth/resend-otp', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        email: userEmail
-                    }),
-                    credentials: 'include'
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showToast('Verification codes sent successfully', 'success');
-                } else {
-                    showToast(result.message || 'Failed to resend codes', 'error');
+                if (!otp || otp.length !== 6) {
+                    setOtpStatus('Please enter the 6-digit OTP.', 'error');
+                    return;
                 }
-            } catch (error) {
-                showToast('An error occurred while resending codes', 'error');
+
+                verifyOtpBtn.disabled = true;
+                setOtpStatus('Verifying OTP...', 'info');
+
+                try {
+                    const response = await fetch(`${API_BASE_URL}/api/auth/register/verify-email-otp`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email, otp }),
+                        credentials: 'include'
+                    });
+
+                    const result = await response.json();
+                    if (response.ok && result.success) {
+                        showToast('Email verified successfully!', 'success');
+                        setOtpStatus('Email verified successfully.', 'success');
+                        hideOtpSection();
+                        emailVerified = true;
+                        setEmailStatus('Email verified.', 'success');
+                        showPasswordSection();
+                        refreshSubmitState();
+                    } else {
+                        const errorMsg = result.message || (result.errors && result.errors.join(', ')) || 'Invalid OTP. Please try again.';
+                        setOtpStatus(errorMsg, 'error');
+                        showToast('Invalid OTP. Please try again.', 'error');
+                        emailVerified = false;
+                        refreshSubmitState();
+                    }
+                } catch (error) {
+                    setOtpStatus('An error occurred during verification.', 'error');
+                    showToast('An error occurred during verification.', 'error');
+                    emailVerified = false;
+                    refreshSubmitState();
+                } finally {
+                    verifyOtpBtn.disabled = false;
+                }
+            });
+
+            // Form submit
+            form.addEventListener('submit', (event) => {
+                if (!(emailVerified && passwordValid && confirmValid)) {
+                    event.preventDefault();
+                }
+            });
+
+            // Check for registration success and show toast, then redirect
+            @if (TempData["RegistrationSuccess"] != null && (bool)TempData["RegistrationSuccess"]!)
+            {
+                <text>
+                showToast('Account created successfully!', 'success');
+
+                // Redirect after toast is shown
+                setTimeout(() => {
+                    window.location.href = '/Account/Setup2fa';
+                }, 1500);
+                </text>
             }
+
+            // Initialize
+            updateValidateEmailButton();
         });
     </script>
 }

@@ -1,65 +1,383 @@
 @page
 @model IndexModel
 @{
-    ViewData["Title"] = "Home";
+    ViewData["Title"] = "Welcome";
+    Layout = "_LandingLayout";
 }
 
-<div class="row justify-content-center">
-    <div class="col-md-8">
-        <div class="card card-shadow">
-            <div class="card-body text-center p-5">
-                <i class="fas fa-wind fa-4x mb-4" style="color: #333333;"></i>
-                <h1 class="display-4 mb-4">Welcome to TurbineAero</h1>
-                <p class="lead mb-4">Your comprehensive turbine management and monitoring platform</p>
-                <div class="row">
-                    <div class="col-md-4 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <i class="fas fa-chart-line fa-2x mb-3" style="color: #333333;"></i>
-                                <h5>Real-time Monitoring</h5>
-                                <p class="text-muted">Monitor turbine performance in real-time</p>
-                            </div>
-                        </div>
+<div class="brand-panel">
+    <img src="~/images/download.png" alt="TurbineAero logo" class="brand-logo" />
+    <p class="brand-tagline">
+        The Boeing C-17 Globemaster III is a large military transport aircraft powered by four Pratt & Whitney F117 turbofan engines, supported by TurbineAero for APU maintenance and overhaul services.
+    </p>
+</div>
+
+<div class="login-panel">
+    <div class="login-card">
+        <form method="post">
+            @Html.AntiForgeryToken()
+            <input type="hidden" asp-for="ReturnUrl" />
+            <div asp-validation-summary="ModelOnly" class="alert alert-danger" role="alert"></div>
+            <div class="mb-3">
+                <input asp-for="Input.Email" class="form-control" placeholder="Email" />
+                <span asp-validation-for="Input.Email" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <input asp-for="Input.Password" class="form-control" placeholder="Password" />
+                <span asp-validation-for="Input.Password" class="text-danger small"></span>
+            </div>
+            <div class="d-grid mb-3">
+                <button type="submit" class="btn btn-login btn-lg">Log In</button>
+            </div>
+        </form>
+        <div class="text-center">
+            <a class="forgot-link" asp-page="/Account/ForgotPassword">Forgot password?</a>
+        </div>
+        <div class="text-center">
+            <a class="btn btn-create btn-lg mt-3" asp-page="/Account/Register">Create new account</a>
+        </div>
+    </div>
+</div>
+
+<!-- 2FA Verification Modal -->
+<div class="modal fade" id="login2FAModal" tabindex="-1" aria-labelledby="login2FAModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content" style="border-radius: 8px; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);">
+            <div class="modal-header" style="border-bottom: none; padding: 24px 24px 16px;">
+                <h5 class="modal-title" id="login2FAModalLabel" style="font-weight: 600;">Choose a Verification Method</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" style="padding: 16px 24px;">
+                <div class="mb-3">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="verificationMethod" id="methodAuthenticator" value="authenticator" checked>
+                        <label class="form-check-label" for="methodAuthenticator" style="font-weight: 500;">
+                            Authenticator App
+                        </label>
                     </div>
-                    <div class="col-md-4 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <i class="fas fa-cogs fa-2x mb-3" style="color: #333333;"></i>
-                                <h5>Maintenance Management</h5>
-                                <p class="text-muted">Schedule and track maintenance activities</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <i class="fas fa-shield-alt fa-2x mb-3" style="color: #333333;"></i>
-                                <h5>Secure & Reliable</h5>
-                                <p class="text-muted">Enterprise-grade security and reliability</p>
-                            </div>
-                        </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="radio" name="verificationMethod" id="methodEmail" value="email">
+                        <label class="form-check-label" for="methodEmail" style="font-weight: 500;">
+                            Email OTP
+                        </label>
                     </div>
                 </div>
-                @if (User.Identity?.IsAuthenticated != true)
-                {
-                    <div class="mt-4">
-                        <a href="/Account/Register" class="btn btn-primary btn-lg me-3">
-                            <i class="fas fa-user-plus me-2"></i>Get Started
-                        </a>
-                        <a href="/Account/Login" class="btn btn-outline-primary btn-lg">
-                            <i class="fas fa-sign-in-alt me-2"></i>Sign In
-                        </a>
+
+                <!-- Authenticator App Section -->
+                <div id="authenticatorSection" class="verification-section">
+                    <label for="authenticatorCode" class="form-label small">Enter 6-digit code</label>
+                    <div class="d-flex gap-2 align-items-end mb-2">
+                        <div class="flex-grow-1">
+                            <input type="text" id="authenticatorCode" class="form-control text-center" 
+                                   maxlength="6" placeholder="000000" autocomplete="one-time-code" 
+                                   style="font-size: 1.25rem; letter-spacing: 0.5rem;" />
+                        </div>
+                        <button type="button" class="btn btn-primary btn-lg" id="verifyAuthenticatorBtn" disabled>
+                            Verify & Continue
+                        </button>
                     </div>
-                }
-                else
-                {
-                    <div class="mt-4">
-                        <a href="/Dashboard" class="btn btn-primary btn-lg">
-                            <i class="fas fa-tachometer-alt me-2"></i>Go to Dashboard
-                        </a>
+                    <div id="authenticatorFeedback" class="small mt-1"></div>
+                </div>
+
+                <!-- Email OTP Section -->
+                <div id="emailSection" class="verification-section d-none">
+                    <div class="mb-2">
+                        <button type="button" class="btn btn-outline-primary" id="sendOtpBtn">
+                            Send OTP
+                        </button>
+                        <div id="otpSentMessage" class="small text-success mt-2 d-none"></div>
                     </div>
-                }
+                    <label for="emailOtpCode" class="form-label small">Enter OTP</label>
+                    <div class="d-flex gap-2 align-items-end mb-2">
+                        <div class="flex-grow-1">
+                            <input type="text" id="emailOtpCode" class="form-control text-center" 
+                                   maxlength="6" placeholder="000000" autocomplete="one-time-code" 
+                                   style="font-size: 1.25rem; letter-spacing: 0.5rem;" />
+                        </div>
+                        <button type="button" class="btn btn-primary btn-lg" id="verifyEmailOtpBtn" disabled>
+                            Verify
+                        </button>
+                    </div>
+                    <div id="emailOtpFeedback" class="small mt-1"></div>
+                </div>
+
+                <div class="text-center mt-3">
+                    <a href="#" id="switchMethodLink" class="small text-muted" style="text-decoration: none;">Use a different method</a>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Toast utility function
+            const showToast = (message, type = 'success') => {
+                const toastHtml = `
+                    <div class="toast align-items-center text-white bg-${type === 'success' ? 'success' : 'danger'} border-0" role="alert" style="min-width: 300px;">
+                        <div class="d-flex">
+                            <div class="toast-body">
+                                ${message}
+                            </div>
+                            <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+                        </div>
+                    </div>
+                `;
+
+                let toastContainer = document.getElementById('toast-container');
+                if (!toastContainer) {
+                    toastContainer = document.createElement('div');
+                    toastContainer.id = 'toast-container';
+                    toastContainer.className = 'toast-container position-fixed top-0 end-0 p-3';
+                    toastContainer.style.zIndex = '9999';
+                    document.body.appendChild(toastContainer);
+                }
+
+                toastContainer.insertAdjacentHTML('beforeend', toastHtml);
+                const toastElement = toastContainer.lastElementChild;
+                const toast = new bootstrap.Toast(toastElement, {
+                    autohide: true,
+                    delay: 3000
+                });
+                toast.show();
+
+                toastElement.addEventListener('hidden.bs.toast', () => {
+                    toastElement.remove();
+                });
+            };
+
+            // Check if 2FA modal should be shown
+            @if (TempData["Show2FAModal"] != null && TempData["Show2FAModal"]?.ToString() == "true")
+            {
+                <text>
+                const login2FAEmail = '@(TempData["Login2FAEmail"]?.ToString() ?? "")';
+                const login2FAReturnUrl = '@(TempData["Login2FAReturnUrl"]?.ToString() ?? "/Dashboard")';
+                </text>
+            }
+            else
+            {
+                <text>
+                const login2FAEmail = null;
+                const login2FAReturnUrl = '/Dashboard';
+                </text>
+            }
+
+            // Modal elements
+            const login2FAModal = document.getElementById('login2FAModal');
+            const methodAuthenticator = document.getElementById('methodAuthenticator');
+            const methodEmail = document.getElementById('methodEmail');
+            const authenticatorSection = document.getElementById('authenticatorSection');
+            const emailSection = document.getElementById('emailSection');
+            const switchMethodLink = document.getElementById('switchMethodLink');
+            const authenticatorCode = document.getElementById('authenticatorCode');
+            const emailOtpCode = document.getElementById('emailOtpCode');
+            const verifyAuthenticatorBtn = document.getElementById('verifyAuthenticatorBtn');
+            const verifyEmailOtpBtn = document.getElementById('verifyEmailOtpBtn');
+            const sendOtpBtn = document.getElementById('sendOtpBtn');
+            const otpSentMessage = document.getElementById('otpSentMessage');
+            const authenticatorFeedback = document.getElementById('authenticatorFeedback');
+            const emailOtpFeedback = document.getElementById('emailOtpFeedback');
+
+            // Show modal if needed
+            if (login2FAEmail && login2FAModal) {
+                const modal = new bootstrap.Modal(login2FAModal);
+                modal.show();
+            }
+
+            // Method selection handlers
+            const updateMethodDisplay = () => {
+                if (methodAuthenticator.checked) {
+                    authenticatorSection.classList.remove('d-none');
+                    emailSection.classList.add('d-none');
+                    switchMethodLink.textContent = 'Use Email OTP instead';
+                } else {
+                    authenticatorSection.classList.add('d-none');
+                    emailSection.classList.remove('d-none');
+                    switchMethodLink.textContent = 'Use Authenticator App instead';
+                }
+            };
+
+            methodAuthenticator.addEventListener('change', updateMethodDisplay);
+            methodEmail.addEventListener('change', updateMethodDisplay);
+            switchMethodLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                if (methodAuthenticator.checked) {
+                    methodEmail.checked = true;
+                } else {
+                    methodAuthenticator.checked = true;
+                }
+                updateMethodDisplay();
+            });
+
+            // Enable verify buttons when code is entered
+            authenticatorCode.addEventListener('input', () => {
+                const code = authenticatorCode.value.trim().replace(/\s/g, '');
+                verifyAuthenticatorBtn.disabled = code.length !== 6;
+            });
+
+            emailOtpCode.addEventListener('input', () => {
+                const code = emailOtpCode.value.trim().replace(/\s/g, '');
+                verifyEmailOtpBtn.disabled = code.length !== 6;
+            });
+
+            // Send OTP button
+            sendOtpBtn.addEventListener('click', async () => {
+                if (!login2FAEmail) return;
+
+                sendOtpBtn.disabled = true;
+                sendOtpBtn.textContent = 'Sending...';
+
+                try {
+                    const response = await fetch('/api/auth/login-2fa/send-otp', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ email: login2FAEmail })
+                    });
+
+                    const result = await response.json();
+                    if (response.ok && result.success) {
+                        showToast('OTP sent to your registered email.', 'success');
+                        otpSentMessage.textContent = 'OTP sent! Check your email.';
+                        otpSentMessage.classList.remove('d-none');
+                        emailOtpCode.focus();
+                    } else {
+                        showToast(result.message || 'Failed to send OTP.', 'error');
+                    }
+                } catch (error) {
+                    showToast('An error occurred while sending OTP.', 'error');
+                } finally {
+                    sendOtpBtn.disabled = false;
+                    sendOtpBtn.textContent = 'Send OTP';
+                }
+            });
+
+            // Verify Authenticator App code
+            verifyAuthenticatorBtn.addEventListener('click', async () => {
+                if (!login2FAEmail) return;
+
+                const code = authenticatorCode.value.trim().replace(/\s/g, '').replace(/-/g, '');
+                if (code.length !== 6) {
+                    authenticatorFeedback.textContent = 'Please enter a 6-digit code.';
+                    authenticatorFeedback.classList.remove('text-success', 'text-muted');
+                    authenticatorFeedback.classList.add('text-danger');
+                    authenticatorFeedback.classList.remove('d-none');
+                    return;
+                }
+
+                verifyAuthenticatorBtn.disabled = true;
+                authenticatorFeedback.textContent = 'Verifying...';
+                authenticatorFeedback.classList.remove('text-success', 'text-danger');
+                authenticatorFeedback.classList.add('text-muted');
+                authenticatorFeedback.classList.remove('d-none');
+
+                try {
+                    const response = await fetch('/api/auth/login-2fa/verify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            email: login2FAEmail,
+                            code: code,
+                            method: 'authenticator'
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (response.ok && result.success) {
+                        showToast('Verification successful!', 'success');
+                        setTimeout(() => {
+                            window.location.href = login2FAReturnUrl;
+                        }, 700);
+                    } else {
+                        authenticatorFeedback.textContent = result.message || 'Invalid code. Please try again.';
+                        authenticatorFeedback.classList.remove('text-success', 'text-muted');
+                        authenticatorFeedback.classList.add('text-danger');
+                        verifyAuthenticatorBtn.disabled = false;
+                        showToast(result.message || 'Invalid code. Please try again.', 'error');
+                    }
+                } catch (error) {
+                    authenticatorFeedback.textContent = 'An error occurred during verification.';
+                    authenticatorFeedback.classList.remove('text-success', 'text-muted');
+                    authenticatorFeedback.classList.add('text-danger');
+                    verifyAuthenticatorBtn.disabled = false;
+                    showToast('An error occurred during verification.', 'error');
+                }
+            });
+
+            // Verify Email OTP
+            verifyEmailOtpBtn.addEventListener('click', async () => {
+                if (!login2FAEmail) return;
+
+                const code = emailOtpCode.value.trim().replace(/\s/g, '').replace(/-/g, '');
+                if (code.length !== 6) {
+                    emailOtpFeedback.textContent = 'Please enter a 6-digit code.';
+                    emailOtpFeedback.classList.remove('text-success', 'text-muted');
+                    emailOtpFeedback.classList.add('text-danger');
+                    emailOtpFeedback.classList.remove('d-none');
+                    return;
+                }
+
+                verifyEmailOtpBtn.disabled = true;
+                emailOtpFeedback.textContent = 'Verifying...';
+                emailOtpFeedback.classList.remove('text-success', 'text-danger');
+                emailOtpFeedback.classList.add('text-muted');
+                emailOtpFeedback.classList.remove('d-none');
+
+                try {
+                    const response = await fetch('/api/auth/login-2fa/verify', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            email: login2FAEmail,
+                            code: code,
+                            method: 'email'
+                        })
+                    });
+
+                    const result = await response.json();
+                    if (response.ok && result.success) {
+                        showToast('Email verified successfully!', 'success');
+                        setTimeout(() => {
+                            window.location.href = login2FAReturnUrl;
+                        }, 700);
+                    } else {
+                        emailOtpFeedback.textContent = result.message || 'Invalid code. Please try again.';
+                        emailOtpFeedback.classList.remove('text-success', 'text-muted');
+                        emailOtpFeedback.classList.add('text-danger');
+                        verifyEmailOtpBtn.disabled = false;
+                        showToast(result.message || 'Invalid code. Please try again.', 'error');
+                    }
+                } catch (error) {
+                    emailOtpFeedback.textContent = 'An error occurred during verification.';
+                    emailOtpFeedback.classList.remove('text-success', 'text-muted');
+                    emailOtpFeedback.classList.add('text-danger');
+                    verifyEmailOtpBtn.disabled = false;
+                    showToast('An error occurred during verification.', 'error');
+                }
+            });
+
+            // Auto-focus and paste handling
+            [authenticatorCode, emailOtpCode].forEach(input => {
+                input.addEventListener('paste', (e) => {
+                    e.preventDefault();
+                    const pastedText = (e.clipboardData || window.clipboardData).getData('text');
+                    const cleaned = pastedText.replace(/\s/g, '').replace(/-/g, '').slice(0, 6);
+                    input.value = cleaned;
+                    if (input === authenticatorCode) {
+                        verifyAuthenticatorBtn.disabled = cleaned.length !== 6;
+                    } else {
+                        verifyEmailOtpBtn.disabled = cleaned.length !== 6;
+                    }
+                });
+            });
+        });
+    </script>
+}

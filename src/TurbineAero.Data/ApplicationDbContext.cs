@@ -41,6 +41,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser>
             entity.Property(e => e.IsPhoneVerified).HasDefaultValue(false);
             entity.Property(e => e.TwoFactorEnabled).HasDefaultValue(false);
             entity.Property(e => e.CreatedAt).IsRequired();
+            entity.Property(e => e.ThemePreference).IsRequired().HasMaxLength(20).HasDefaultValue("light");
         });
     }
 }

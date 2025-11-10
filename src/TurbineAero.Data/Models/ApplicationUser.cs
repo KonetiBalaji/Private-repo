@@ -11,4 +11,5 @@ public class ApplicationUser : IdentityUser
     public new bool TwoFactorEnabled { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime? LastLoginAt { get; set; }
+    public string ThemePreference { get; set; } = "light";
 }

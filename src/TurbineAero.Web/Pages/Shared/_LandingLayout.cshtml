@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] - TurbineAero</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <style>
+        body {
+            background-color: #f4f6f8;
+            font-family: "Segoe UI", Arial, sans-serif;
+            color: #1a1a1a;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        body.dark-mode {
+            background-color: #0d1117;
+            color: #e4e6eb;
+        }
+
+        a {
+            color: #0066cc;
+            transition: color 0.3s ease;
+        }
+
+        body.dark-mode a {
+            color: #58a6ff;
+        }
+
+        .landing-wrapper {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .landing-content {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 80px;
+            padding: 40px 20px 120px;
+        }
+
+        .brand-panel {
+            max-width: 500px;
+        }
+
+        .brand-logo {
+            max-width: 320px;
+            width: 100%;
+            height: auto;
+        }
+
+        .brand-tagline {
+            font-size: 1.25rem;
+            line-height: 1.45;
+            margin-top: 20px;
+            color: inherit;
+        }
+
+        .login-panel {
+            width: 396px;
+        }
+
+        .login-card {
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.15);
+            padding: 18px 18px 24px;
+            transition: background 0.3s ease, color 0.3s ease, border 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        body.dark-mode .login-card {
+            background: #161b22;
+            color: #e4e6eb;
+            border: 1px solid #1f252e;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+        }
+
+        .login-card input.form-control {
+            height: 52px;
+            border-radius: 6px;
+            border-color: #cbd3dc;
+            background: #ffffff;
+            color: #1a1a1a;
+        }
+
+        .login-card input.form-control:focus {
+            border-color: #0066cc;
+            box-shadow: none;
+        }
+
+        body.dark-mode .login-card input.form-control {
+            background: #0f1623;
+            border-color: #1f252e;
+            color: #e4e6eb;
+        }
+
+        body.dark-mode .login-card input.form-control:focus {
+            border-color: #58a6ff;
+        }
+
+        .btn-login {
+            background-color: #1877f2;
+            border-color: #1877f2;
+            font-weight: 600;
+            height: 52px;
+            border-radius: 6px;
+        }
+
+        .btn-login:hover {
+            background-color: #1366d1;
+            border-color: #1366d1;
+        }
+
+        body.dark-mode .btn-login {
+            background-color: #2563eb;
+            border-color: #2563eb;
+        }
+
+        .forgot-link {
+            color: #0066cc;
+            font-size: 0.95rem;
+            margin-top: 0;
+            display: inline-block;
+        }
+
+        body.dark-mode .forgot-link {
+            color: #58a6ff;
+        }
+
+        .divider {
+            border-bottom: 1px solid #dde1e6;
+            margin: 20px 0;
+        }
+
+        body.dark-mode .divider {
+            border-color: #1f252e;
+        }
+
+        .btn-create {
+            background-color: #42b72a;
+            border-color: #42b72a;
+            font-weight: 600;
+            height: 48px;
+            border-radius: 6px;
+        }
+
+        .btn-create:hover {
+            background-color: #36a420;
+            border-color: #36a420;
+        }
+
+        body.dark-mode .btn-create {
+            background-color: #16a34a;
+            border-color: #16a34a;
+        }
+
+        @@media (max-width: 992px) {
+            .landing-content {
+                flex-direction: column;
+                gap: 40px;
+                padding: 60px 20px;
+            }
+
+            .brand-panel {
+                text-align: center;
+            }
+
+            .brand-tagline {
+                font-size: 1.4rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="landing-wrapper">
+        <div class="landing-content">
+            @RenderBody()
+        </div>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            Object.keys(localStorage)
+                .filter(key => key.startsWith('theme:'))
+                .forEach(key => localStorage.removeItem(key));
+            document.body.classList.remove('dark-mode');
+        });
+    </script>
+    @RenderSection("Scripts", required: false)
+</body>
+</html>
+

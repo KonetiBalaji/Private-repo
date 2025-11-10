@@ -3,7 +3,8 @@ namespace TurbineAero.Core.Constants;
 public static class AppConstants
 {
     public const int OtpLength = 6;
-    public const int OtpExpiryMinutes = 15;
+    public const int OtpExpiryMinutes = 5;
+    public const int OtpResendCooldownSeconds = 60;
     public const int PasswordResetTokenExpiryMinutes = 15;
     public const int MaxOtpAttempts = 3;
     

@@ -33,7 +33,7 @@ public class EmailService : IEmailService
                 string.IsNullOrWhiteSpace(smtpUser) || string.IsNullOrWhiteSpace(smtpPass) ||
                 string.IsNullOrWhiteSpace(fromAddress))
             {
-                _logger.LogWarning("SMTP not configured. Simulating OTP email to {Email}. OTP: {Otp}", email, otp);
+                _logger.LogWarning("SMTP not configured. Simulating OTP email delivery to {Email}.", email);
                 return true; // simulate success
             }
 
@@ -78,12 +78,28 @@ public class EmailService : IEmailService
     {
         try
         {
+            // If SMTP is not configured, simulate success for development/testing
+            var smtpHost = _configuration["Email:SmtpHost"]; 
+            var smtpPort = _configuration["Email:SmtpPort"]; 
+            var smtpUser = _configuration["Email:Username"]; 
+            var smtpPass = _configuration["Email:Password"]; 
+            var fromAddress = _configuration["Email:FromAddress"]; 
+            var env = _configuration["ASPNETCORE_ENVIRONMENT"] ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+
+            if (string.IsNullOrWhiteSpace(smtpHost) || string.IsNullOrWhiteSpace(smtpPort) ||
+                string.IsNullOrWhiteSpace(smtpUser) || string.IsNullOrWhiteSpace(smtpPass) ||
+                string.IsNullOrWhiteSpace(fromAddress))
+            {
+                _logger.LogWarning("SMTP not configured. Simulating password reset email delivery to {Email}. Reset token: {Token}", email, resetToken);
+                return true; // simulate success
+            }
+
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(AppConstants.Email.FromName, _configuration["Email:FromAddress"]));
+            message.From.Add(new MailboxAddress(AppConstants.Email.FromName, fromAddress));
             message.To.Add(new MailboxAddress("", email));
             message.Subject = AppConstants.Email.SubjectPasswordReset;
 
-            var resetUrl = $"{_configuration["App:BaseUrl"]}/reset-password?token={resetToken}&email={email}";
+            var resetUrl = $"{_configuration["App:BaseUrl"]}/Account/ResetPassword?token={Uri.EscapeDataString(resetToken)}&email={Uri.EscapeDataString(email)}";
 
             var bodyBuilder = new BodyBuilder
             {
@@ -94,6 +110,8 @@ public class EmailService : IEmailService
                         <div style='text-align: center; margin: 30px 0;'>
                             <a href='{resetUrl}' style='background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;'>Reset Password</a>
                         </div>
+                        <p>Or copy and paste this link into your browser:</p>
+                        <p style='word-break: break-all; color: #666;'>{resetUrl}</p>
                         <p>This link will expire in {AppConstants.PasswordResetTokenExpiryMinutes} minutes.</p>
                         <p>If you didn't request this reset, please ignore this email.</p>
                     </div>"
@@ -102,9 +120,8 @@ public class EmailService : IEmailService
             message.Body = bodyBuilder.ToMessageBody();
 
             using var client = new SmtpClient();
-            await client.ConnectAsync(_configuration["Email:SmtpHost"], 
-                int.Parse(_configuration["Email:SmtpPort"]!), false);
-            await client.AuthenticateAsync(_configuration["Email:Username"], _configuration["Email:Password"]);
+            await client.ConnectAsync(smtpHost, int.Parse(smtpPort!), false);
+            await client.AuthenticateAsync(smtpUser, smtpPass);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 
@@ -114,6 +131,15 @@ public class EmailService : IEmailService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send password reset email to {Email}", email);
+            
+            // In development mode, simulate success even if SMTP fails
+            var env = _configuration["ASPNETCORE_ENVIRONMENT"] ?? Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development";
+            if (string.Equals(env, "Development", StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning("SMTP email send failed but continuing because environment is Development. Reset token: {Token}", resetToken);
+                return true; // simulate success in development
+            }
+            
             return false;
         }
     }
@@ -122,30 +148,49 @@ public class EmailService : IEmailService
     {
         try
         {
+            // If SMTP is not configured, simulate success for development/testing
+            var smtpHost = _configuration["Email:SmtpHost"]; 
+            var smtpPort = _configuration["Email:SmtpPort"]; 
+            var smtpUser = _configuration["Email:Username"]; 
+            var smtpPass = _configuration["Email:Password"]; 
+            var fromAddress = _configuration["Email:FromAddress"]; 
+
+            if (string.IsNullOrWhiteSpace(smtpHost) || string.IsNullOrWhiteSpace(smtpPort) ||
+                string.IsNullOrWhiteSpace(smtpUser) || string.IsNullOrWhiteSpace(smtpPass) ||
+                string.IsNullOrWhiteSpace(fromAddress))
+            {
+                _logger.LogWarning("SMTP not configured. Simulating welcome email delivery to {Email}.", email);
+                return true; // simulate success
+            }
+
             var message = new MimeMessage();
-            message.From.Add(new MailboxAddress(AppConstants.Email.FromName, _configuration["Email:FromAddress"]));
+            message.From.Add(new MailboxAddress(AppConstants.Email.FromName, fromAddress));
             message.To.Add(new MailboxAddress(firstName, email));
             message.Subject = AppConstants.Email.SubjectWelcome;
+
+            var setup2FaUrl = $"{_configuration["App:BaseUrl"]}/Account/Setup2fa";
 
             var bodyBuilder = new BodyBuilder
             {
                 HtmlBody = $@"
                     <div style='font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;'>
-                        <h2 style='color: #333;'>Welcome to TurbineAero, {firstName}!</h2>
-                        <p>Your account has been successfully created. You can now log in and start using our services.</p>
+                        <h2 style='color: #333;'>Welcome to TurbineAero</h2>
+                        <p>Hi {firstName},</p>
+                        <p>Your TurbineAero account has been successfully created.</p>
+                        <p><strong>Next Step:</strong> Please set up your Two-Factor Authentication (2FA) to secure your account.</p>
                         <div style='text-align: center; margin: 30px 0;'>
-                            <a href='{_configuration["App:BaseUrl"]}/login' style='background-color: #28a745; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;'>Login to Your Account</a>
+                            <a href='{setup2FaUrl}' style='background-color: #007bff; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;'>Set Up 2FA</a>
                         </div>
-                        <p>Thank you for choosing TurbineAero!</p>
+                        <p>Click the link above or go to: <a href='{setup2FaUrl}'>{setup2FaUrl}</a></p>
+                        <p>Thank you,<br>The TurbineAero Team</p>
                     </div>"
             };
 
             message.Body = bodyBuilder.ToMessageBody();
 
             using var client = new SmtpClient();
-            await client.ConnectAsync(_configuration["Email:SmtpHost"], 
-                int.Parse(_configuration["Email:SmtpPort"]!), false);
-            await client.AuthenticateAsync(_configuration["Email:Username"], _configuration["Email:Password"]);
+            await client.ConnectAsync(smtpHost, int.Parse(smtpPort!), false);
+            await client.AuthenticateAsync(smtpUser, smtpPass);
             await client.SendAsync(message);
             await client.DisconnectAsync(true);
 

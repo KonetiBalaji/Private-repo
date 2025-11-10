@@ -66,9 +66,8 @@ public class AuthController : ControllerBase
                 Email = request.Email,
                 FirstName = request.FirstName,
                 LastName = request.LastName,
-                PhoneNumber = request.Phone,
-                IsEmailVerified = false,
-                IsPhoneVerified = false
+                IsEmailVerified = true,
+                IsPhoneVerified = true
             };
 
             var result = await _userManager.CreateAsync(user, request.Password);
@@ -78,32 +77,102 @@ public class AuthController : ControllerBase
                 return BadRequest(ApiResponse<object>.ErrorResult("Registration failed", errors));
             }
 
-            // Generate and send OTPs
-            var emailOtp = await _otpService.GenerateOtpAsync(request.Email, OtpType.Email);
-            var phoneOtp = await _otpService.GenerateOtpAsync(request.Phone, OtpType.Phone);
-
-            // Send OTPs
-            var emailSent = await _emailService.SendOtpEmailAsync(request.Email, emailOtp);
-            var smsSent = await _smsService.SendOtpSmsAsync(request.Phone, phoneOtp);
-
-            if (!emailSent || !smsSent)
-            {
-                // Allow registration to proceed in Development if delivery fails
-                var isDevelopment = string.Equals(_configuration["ASPNETCORE_ENVIRONMENT"], "Development", StringComparison.OrdinalIgnoreCase);
-                if (!isDevelopment)
-                {
-                    _logger.LogWarning("Failed to send OTPs for user {Email}", request.Email);
-                    return BadRequest(ApiResponse<object>.ErrorResult("Failed to send verification codes"));
-                }
-                _logger.LogWarning("OTP delivery failed but proceeding in Development mode for {Email}", request.Email);
-            }
-
-            return Ok(ApiResponse<object>.SuccessResult(new { }, "Registration successful. Please verify your email and phone number."));
+            return Ok(ApiResponse<object>.SuccessResult(new { }, "Registration successful."));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during registration for {Email}", request.Email);
             return StatusCode(500, ApiResponse<object>.ErrorResult("An error occurred during registration"));
+        }
+    }
+
+    [HttpPost("register/send-email-otp")]
+    public async Task<ActionResult<ApiResponse<object>>> SendEmailOtp([FromBody] SendEmailOtpRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+            return BadRequest(ApiResponse<object>.ErrorResult("Invalid email", errors));
+        }
+
+        try
+        {
+            var email = request.Email.Trim().ToLowerInvariant();
+
+            var existingUser = await _userManager.FindByEmailAsync(email);
+            if (existingUser != null)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("An account with this email already exists."));
+            }
+
+            var recentOtp = await _context.OtpLogs
+                .Where(o => o.Identifier == email && o.OtpType == OtpType.Email.ToString())
+                .OrderByDescending(o => o.CreatedAt)
+                .FirstOrDefaultAsync();
+
+            if (recentOtp != null && !recentOtp.IsUsed)
+            {
+                var secondsSinceLastOtp = (DateTime.UtcNow - recentOtp.CreatedAt).TotalSeconds;
+                if (secondsSinceLastOtp < AppConstants.OtpResendCooldownSeconds)
+                {
+                    var waitSeconds = Math.Max(1, AppConstants.OtpResendCooldownSeconds - (int)secondsSinceLastOtp);
+                    return BadRequest(ApiResponse<object>.ErrorResult($"Please wait {waitSeconds} seconds before requesting a new OTP."));
+                }
+
+                if (recentOtp.ExpiresAt <= DateTime.UtcNow)
+                {
+                    _context.OtpLogs.Remove(recentOtp);
+                    await _context.SaveChangesAsync();
+                }
+            }
+
+            var code = await _otpService.GenerateOtpAsync(email, OtpType.Email);
+            var sent = await _emailService.SendOtpEmailAsync(email, code);
+
+            if (!sent)
+            {
+                var env = _configuration["ASPNETCORE_ENVIRONMENT"];
+                if (!string.Equals(env, "Development", StringComparison.OrdinalIgnoreCase))
+                {
+                    return StatusCode(500, ApiResponse<object>.ErrorResult("Failed to send OTP. Please try again."));
+                }
+
+                _logger.LogWarning("OTP email send failed but continuing because environment is Development for {Email}", email);
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(new { }, "OTP sent successfully."));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error sending email OTP for {Email}", request.Email);
+            return StatusCode(500, ApiResponse<object>.ErrorResult("An error occurred while sending the OTP."));
+        }
+    }
+
+    [HttpPost("register/verify-email-otp")]
+    public async Task<ActionResult<ApiResponse<object>>> VerifyEmailOtp([FromBody] VerifyEmailOtpRequest request)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+            return BadRequest(ApiResponse<object>.ErrorResult("Invalid verification request", errors));
+        }
+
+        try
+        {
+            var email = request.Email.Trim().ToLowerInvariant();
+            var verified = await _otpService.VerifyOtpAsync(email, request.Otp.Trim(), OtpType.Email);
+            if (!verified)
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Invalid OTP."));
+            }
+
+            return Ok(ApiResponse<object>.SuccessResult(new { }, "Email verified."));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error verifying email OTP for {Email}", request.Email);
+            return StatusCode(500, ApiResponse<object>.ErrorResult("An error occurred during OTP verification."));
         }
     }
 
@@ -219,9 +288,9 @@ public class AuthController : ControllerBase
             }
 
             // Check if user is verified
-            if (!user.IsEmailVerified || !user.IsPhoneVerified)
+        if (!user.IsEmailVerified)
             {
-                return BadRequest(ApiResponse<object>.ErrorResult("Please verify your email and phone number first"));
+            return BadRequest(ApiResponse<object>.ErrorResult("Please verify your email first"));
             }
 
             // Update last login
@@ -243,8 +312,19 @@ public class AuthController : ControllerBase
     [HttpPost("forgot-password")]
     public async Task<ActionResult<ApiResponse<object>>> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage).ToList();
+            return BadRequest(ApiResponse<object>.ErrorResult("Invalid request", errors));
+        }
+
         try
         {
+            if (string.IsNullOrWhiteSpace(request.Email))
+            {
+                return BadRequest(ApiResponse<object>.ErrorResult("Email is required"));
+            }
+
             var user = await _userManager.FindByEmailAsync(request.Email);
             if (user == null)
             {
@@ -255,9 +335,12 @@ public class AuthController : ControllerBase
             var token = await _userManager.GeneratePasswordResetTokenAsync(user);
             var emailSent = await _emailService.SendPasswordResetEmailAsync(request.Email, token);
 
-            if (!emailSent)
+            // Always return success message for security (don't reveal if email was sent)
+            // In development, email service will simulate success even if SMTP fails
+            var env = _configuration["ASPNETCORE_ENVIRONMENT"];
+            if (!emailSent && !string.Equals(env, "Development", StringComparison.OrdinalIgnoreCase))
             {
-                return BadRequest(ApiResponse<object>.ErrorResult("Failed to send password reset email"));
+                _logger.LogWarning("Failed to send password reset email to {Email}, but returning success for security", request.Email);
             }
 
             return Ok(ApiResponse<object>.SuccessResult(new { }, "If the email exists, a password reset link has been sent"));
