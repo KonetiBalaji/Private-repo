@@ -6,7 +6,6 @@ namespace TurbineAero.Services;
 
 /// <summary>
 /// Local file system storage service (fallback when FTP is not configured)
-/// Note: This requires IWebHostEnvironment which should be injected in the Web project
 /// </summary>
 public class LocalFileStorageService : IFileStorageService
 {
@@ -16,14 +15,20 @@ public class LocalFileStorageService : IFileStorageService
     public LocalFileStorageService(IConfiguration configuration, ILogger<LocalFileStorageService> logger)
     {
         var basePath = configuration["FileStorage:LocalBasePath"] ?? "uploads";
-        // Use absolute path or relative to current directory
-        _baseDirectory = Path.IsPathRooted(basePath) ? basePath : Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", basePath);
+        
+        // Try to find wwwroot directory, otherwise use current directory
+        var currentDir = Directory.GetCurrentDirectory();
+        var wwwrootPath = Path.Combine(currentDir, "wwwroot");
+        var rootPath = Directory.Exists(wwwrootPath) ? wwwrootPath : currentDir;
+        
+        _baseDirectory = Path.IsPathRooted(basePath) ? basePath : Path.Combine(rootPath, basePath);
         _logger = logger;
         
         // Ensure base directory exists
         if (!Directory.Exists(_baseDirectory))
         {
             Directory.CreateDirectory(_baseDirectory);
+            _logger.LogInformation("Created local storage directory: {Directory}", _baseDirectory);
         }
     }
 

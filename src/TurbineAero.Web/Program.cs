@@ -72,7 +72,20 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ISmsService, SmsService>();
 builder.Services.AddScoped<IOtpService, OtpService>();
-builder.Services.AddScoped<IFileStorageService, FtpFileStorageService>();
+
+// Register file storage service - use FTP if properly configured, otherwise use local storage
+var ftpHost = builder.Configuration["Ftp:Host"];
+if (!string.IsNullOrWhiteSpace(ftpHost) && 
+    ftpHost != "ftp.example.com" && 
+    !ftpHost.StartsWith("your-", StringComparison.OrdinalIgnoreCase))
+{
+    builder.Services.AddScoped<IFileStorageService, FtpFileStorageService>();
+}
+else
+{
+    // Use local file storage (files stored in wwwroot/uploads)
+    builder.Services.AddScoped<IFileStorageService, LocalFileStorageService>();
+}
 
 // Add HTTP client for API calls
 builder.Services.AddHttpClient();
