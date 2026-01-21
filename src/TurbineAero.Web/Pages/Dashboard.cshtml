@@ -4,10 +4,236 @@
     ViewData["Title"] = "Dashboard";
 }
 
-<section class="d-flex flex-column align-items-center justify-content-center text-center py-5">
-    <i class="fas fa-tools fa-3x mb-3 text-muted"></i>
-    <h1 class="h3 mb-2">Dashboard Under Construction</h1>
-    <p class="text-muted mb-0">
-        We’re building a data-rich experience here. Check back soon for live turbine metrics and actionable insights.
-    </p>
-</section>
+<div class="container-fluid py-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">File Management</h2>
+            
+            <!-- File Upload Section -->
+            <div class="card card-shadow mb-4">
+                <div class="card-header bg-transparent border-bottom">
+                    <h5 class="mb-0"><i class="fas fa-upload me-2"></i>Upload Files</h5>
+                </div>
+                <div class="card-body">
+                    <form id="uploadForm" enctype="multipart/form-data" method="post">
+                        @Html.AntiForgeryToken()
+                        <div class="mb-3">
+                            <label for="fileInput" class="form-label">Select PDF Files (Multiple files allowed)</label>
+                            <input type="file" class="form-control" id="fileInput" name="files" multiple accept=".pdf,application/pdf" />
+                            <div class="form-text">Only PDF files are accepted. Maximum file size: 50MB per file.</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="uploadBtn">
+                            <i class="fas fa-upload me-2"></i>Upload Files
+                        </button>
+                    </form>
+                    <div id="uploadProgress" class="mt-3" style="display: none;">
+                        <div class="progress">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
+                        </div>
+                        <div class="mt-2 text-muted small" id="uploadStatus"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Files List Section -->
+            <div class="card card-shadow">
+                <div class="card-header bg-transparent border-bottom d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="fas fa-file-pdf me-2"></i>Uploaded Files</h5>
+                    <span class="badge bg-primary" id="fileCount">@Model.Files.Count</span>
+                </div>
+                <div class="card-body">
+                    @if (Model.Files.Any())
+                    {
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>File Name</th>
+                                        <th>Size</th>
+                                        <th>Uploaded</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="filesTableBody">
+                                    @foreach (var file in Model.Files)
+                                    {
+                                        <tr data-file-id="@file.Id">
+                                            <td>
+                                                <i class="fas fa-file-pdf text-danger me-2"></i>
+                                                @file.OriginalFileName
+                                            </td>
+                                            <td>@FormatFileSize(file.FileSize)</td>
+                                            <td>@file.UploadedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                                            <td>
+                                                <a href="/Dashboard?handler=Download&id=@file.Id" target="_blank" class="btn btn-sm btn-outline-info me-2" title="View">
+                                                    <i class="fas fa-eye"></i>
+                                                </a>
+                                                <a href="/Dashboard?handler=Download&id=@file.Id" download class="btn btn-sm btn-outline-primary me-2" title="Download">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+                                                <button type="button" class="btn btn-sm btn-outline-danger delete-file" data-file-id="@file.Id" title="Delete">
+                                                    <i class="fas fa-trash"></i>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    }
+                                </tbody>
+                            </table>
+                        </div>
+                    }
+                    else
+                    {
+                        <div class="text-center py-5">
+                            <i class="fas fa-folder-open fa-3x text-muted mb-3"></i>
+                            <p class="text-muted">No files uploaded yet. Upload your first PDF file above.</p>
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@functions {
+    private string FormatFileSize(long bytes)
+    {
+        string[] sizes = { "B", "KB", "MB", "GB" };
+        double len = bytes;
+        int order = 0;
+        while (len >= 1024 && order < sizes.Length - 1)
+        {
+            order++;
+            len = len / 1024;
+        }
+        return $"{len:0.##} {sizes[order]}";
+    }
+}
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const uploadForm = document.getElementById('uploadForm');
+            const fileInput = document.getElementById('fileInput');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const uploadProgress = document.getElementById('uploadProgress');
+            const uploadStatus = document.getElementById('uploadStatus');
+            const filesTableBody = document.getElementById('filesTableBody');
+            const fileCount = document.getElementById('fileCount');
+
+            // File upload handler
+            uploadForm.addEventListener('submit', async function(e) {
+                e.preventDefault();
+                
+                const files = fileInput.files;
+                if (files.length === 0) {
+                    showToast('Please select at least one file.', 'danger');
+                    return;
+                }
+
+                // Validate all files are PDFs
+                for (let i = 0; i < files.length; i++) {
+                    if (!files[i].name.toLowerCase().endsWith('.pdf')) {
+                        showToast('Only PDF files are allowed.', 'danger');
+                        return;
+                    }
+                }
+
+                const formData = new FormData();
+                for (let i = 0; i < files.length; i++) {
+                    formData.append('files', files[i]);
+                }
+
+                uploadBtn.disabled = true;
+                uploadProgress.style.display = 'block';
+                uploadStatus.textContent = 'Uploading files...';
+                
+                // Get anti-forgery token
+                const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                if (token) {
+                    formData.append('__RequestVerificationToken', token);
+                }
+                
+                try {
+                    const response = await fetch('/Dashboard?handler=Upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showToast(result.message, 'success');
+                        fileInput.value = '';
+                        
+                        // Reload page to show new files
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1000);
+                    } else {
+                        showToast(result.message || 'Upload failed.', 'danger');
+                        if (result.errors && result.errors.length > 0) {
+                            result.errors.forEach(error => {
+                                showToast(error, 'danger');
+                            });
+                        }
+                    }
+                } catch (error) {
+                    showToast('An error occurred while uploading files.', 'danger');
+                    console.error('Upload error:', error);
+                } finally {
+                    uploadBtn.disabled = false;
+                    uploadProgress.style.display = 'none';
+                }
+            });
+
+            // Delete file handler
+            document.querySelectorAll('.delete-file').forEach(btn => {
+                btn.addEventListener('click', async function() {
+                    const fileId = this.getAttribute('data-file-id');
+                    const fileName = this.closest('tr').querySelector('td').textContent.trim();
+                    
+                    if (!confirm(`Are you sure you want to delete "${fileName}"?`)) {
+                        return;
+                    }
+
+                    const formData = new FormData();
+                    formData.append('id', fileId);
+                    
+                    // Get anti-forgery token
+                    const token = document.querySelector('input[name="__RequestVerificationToken"]')?.value;
+                    if (token) {
+                        formData.append('__RequestVerificationToken', token);
+                    }
+                    
+                    try {
+                        const response = await fetch('/Dashboard?handler=Delete', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const result = await response.json();
+                        
+                        if (result.success) {
+                            showToast(result.message, 'success');
+                            const row = document.querySelector(`tr[data-file-id="${fileId}"]`);
+                            if (row) {
+                                row.remove();
+                                const remainingFiles = document.querySelectorAll('#filesTableBody tr').length;
+                                fileCount.textContent = remainingFiles;
+                                
+                                if (remainingFiles === 0) {
+                                    location.reload();
+                                }
+                            }
+                        } else {
+                            showToast(result.message || 'Delete failed.', 'danger');
+                        }
+                    } catch (error) {
+                        showToast('An error occurred while deleting the file.', 'danger');
+                        console.error('Delete error:', error);
+                    }
+                });
+            });
+        });
+    </script>
+}
