@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Security;
 using System.Security.Cryptography.X509Certificates;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using TurbineAero.Core.Interfaces;
 
 namespace TurbineAero.Services;
@@ -20,7 +22,7 @@ public class FtpFileStorageService : IFileStorageService
         _ftpUsername = configuration["Ftp:Username"] ?? throw new ArgumentNullException("Ftp:Username");
         _ftpPassword = configuration["Ftp:Password"] ?? throw new ArgumentNullException("Ftp:Password");
         _ftpBasePath = configuration["Ftp:BasePath"] ?? "/uploads";
-        _useSsl = configuration.GetValue<bool>("Ftp:UseSsl", false);
+        _useSsl = bool.TryParse(configuration["Ftp:UseSsl"], out var useSsl) && useSsl;
         _logger = logger;
 
         // Ignore SSL certificate errors for self-signed certificates (use with caution in production)

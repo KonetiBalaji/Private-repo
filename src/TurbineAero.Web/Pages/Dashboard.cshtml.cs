@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
+using System.Linq;
 using System.Security.Claims;
 using TurbineAero.Core.Interfaces;
 using TurbineAero.Data;
@@ -237,12 +238,47 @@ public class DashboardModel : PageModel
     /// </summary>
     private string ExtractRemotePathFromFtpUrl(string filePath)
     {
+        if (string.IsNullOrEmpty(filePath))
+        {
+            throw new ArgumentException("File path cannot be null or empty", nameof(filePath));
+        }
+
         // If it's an FTP URL (starts with ftp:// or ftps://), extract the path
         if (filePath.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase) || 
             filePath.StartsWith("ftps://", StringComparison.OrdinalIgnoreCase))
         {
-            var uri = new Uri(filePath);
-            return uri.PathAndQuery.TrimStart('/');
+            try
+            {
+                var uri = new Uri(filePath);
+                var path = uri.PathAndQuery.TrimStart('/');
+                
+                // Remove the base path if it's included in the URL
+                // For example: ftp://host/uploads/userId/file.pdf -> userId/file.pdf
+                var pathParts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+                if (pathParts.Length > 1)
+                {
+                    // Skip the base path (usually "uploads") and return the rest
+                    return string.Join("/", pathParts.Skip(1));
+                }
+                
+                return path;
+            }
+            catch (UriFormatException ex)
+            {
+                _logger.LogWarning(ex, "Invalid FTP URL format: {FilePath}", filePath);
+                // If URL parsing fails, try to extract path manually
+                var parts = filePath.Split(new[] { "://" }, StringSplitOptions.None);
+                if (parts.Length > 1)
+                {
+                    var afterProtocol = parts[1];
+                    var slashIndex = afterProtocol.IndexOf('/');
+                    if (slashIndex >= 0)
+                    {
+                        return afterProtocol.Substring(slashIndex + 1).TrimStart('/');
+                    }
+                }
+                return filePath;
+            }
         }
         
         // If it's already a relative path (e.g., "userId/filename.pdf"), return as-is
