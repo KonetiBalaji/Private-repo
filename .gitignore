@@ -74,10 +74,3 @@ dotnet-sdk-8.0.415-win-x64 (1).exe
 # Uploaded files
 **/wwwroot/uploads/
 
-# App settings (contains sensitive data - connection strings, API keys, etc.)
-# DO NOT commit these files to version control
-src/TurbineAero.API/appsettings.json
-src/TurbineAero.Web/appsettings.json
-
-src/TurbineAero.API/appsettings.json
-src/TurbineAero.Web/appsettings.json
