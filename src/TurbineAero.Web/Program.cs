@@ -72,6 +72,7 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<ISmsService, SmsService>();
 builder.Services.AddScoped<IOtpService, OtpService>();
+builder.Services.AddScoped<IFileStorageService, FtpFileStorageService>();
 
 // Add HTTP client for API calls
 builder.Services.AddHttpClient();

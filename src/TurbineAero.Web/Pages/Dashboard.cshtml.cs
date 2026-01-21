@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using TurbineAero.Core.Interfaces;
 using TurbineAero.Data;
 using TurbineAero.Data.Models;
 
@@ -14,15 +15,18 @@ public class DashboardModel : PageModel
     private readonly ApplicationDbContext _context;
     private readonly IWebHostEnvironment _environment;
     private readonly ILogger<DashboardModel> _logger;
+    private readonly IFileStorageService _fileStorageService;
 
     public DashboardModel(
         ApplicationDbContext context,
         IWebHostEnvironment environment,
-        ILogger<DashboardModel> logger)
+        ILogger<DashboardModel> logger,
+        IFileStorageService fileStorageService)
     {
         _context = context;
         _environment = environment;
         _logger = logger;
+        _fileStorageService = fileStorageService;
     }
 
     public List<UserFile> Files { get; set; } = new();
@@ -67,12 +71,6 @@ public class DashboardModel : PageModel
             };
         }
 
-        var uploadsFolder = Path.Combine(_environment.WebRootPath, "uploads", userId);
-        if (!Directory.Exists(uploadsFolder))
-        {
-            Directory.CreateDirectory(uploadsFolder);
-        }
-
         var uploadedFiles = new List<object>();
         var errors = new List<string>();
 
@@ -96,19 +94,18 @@ public class DashboardModel : PageModel
                 }
 
                 var uniqueFileName = $"{Guid.NewGuid()}_{file.FileName}";
-                var filePath = Path.Combine(uploadsFolder, uniqueFileName);
+                var remotePath = $"{userId}/{uniqueFileName}";
 
-                using (var stream = new FileStream(filePath, FileMode.Create))
-                {
-                    await file.CopyToAsync(stream);
-                }
+                // Upload to FTP
+                using var fileStream = file.OpenReadStream();
+                var ftpPath = await _fileStorageService.UploadFileAsync(fileStream, remotePath);
 
                 var userFile = new UserFile
                 {
                     UserId = userId,
                     FileName = uniqueFileName,
                     OriginalFileName = file.FileName,
-                    FilePath = filePath,
+                    FilePath = ftpPath, // Store FTP path instead of local path
                     FileSize = file.Length,
                     ContentType = file.ContentType,
                     UploadedAt = DateTime.UtcNow
@@ -167,13 +164,29 @@ public class DashboardModel : PageModel
         var file = await _context.UserFiles
             .FirstOrDefaultAsync(f => f.Id == id && f.UserId == userId);
 
-        if (file == null || !System.IO.File.Exists(file.FilePath))
+        if (file == null)
         {
             return NotFound();
         }
 
-        var fileBytes = await System.IO.File.ReadAllBytesAsync(file.FilePath);
-        return File(fileBytes, file.ContentType, file.OriginalFileName);
+        try
+        {
+            // Extract remote path from FTP URL or use FilePath directly
+            var remotePath = ExtractRemotePathFromFtpUrl(file.FilePath);
+            var fileStream = await _fileStorageService.DownloadFileAsync(remotePath);
+            
+            return File(fileStream, file.ContentType, file.OriginalFileName);
+        }
+        catch (FileNotFoundException)
+        {
+            _logger.LogWarning("File not found on FTP: {FilePath}", file.FilePath);
+            return NotFound();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error downloading file from FTP: {FilePath}", file.FilePath);
+            return StatusCode(500, "Error downloading file.");
+        }
     }
 
     public async Task<IActionResult> OnPostDeleteAsync([FromForm] int id)
@@ -200,10 +213,9 @@ public class DashboardModel : PageModel
 
         try
         {
-            if (System.IO.File.Exists(file.FilePath))
-            {
-                System.IO.File.Delete(file.FilePath);
-            }
+            // Extract remote path from FTP URL or use FilePath directly
+            var remotePath = ExtractRemotePathFromFtpUrl(file.FilePath);
+            await _fileStorageService.DeleteFileAsync(remotePath);
 
             _context.UserFiles.Remove(file);
             await _context.SaveChangesAsync();
@@ -218,5 +230,22 @@ public class DashboardModel : PageModel
                 StatusCode = 500
             };
         }
+    }
+
+    /// <summary>
+    /// Extracts the remote path from an FTP URL or returns the path as-is if it's already a relative path
+    /// </summary>
+    private string ExtractRemotePathFromFtpUrl(string filePath)
+    {
+        // If it's an FTP URL (starts with ftp:// or ftps://), extract the path
+        if (filePath.StartsWith("ftp://", StringComparison.OrdinalIgnoreCase) || 
+            filePath.StartsWith("ftps://", StringComparison.OrdinalIgnoreCase))
+        {
+            var uri = new Uri(filePath);
+            return uri.PathAndQuery.TrimStart('/');
+        }
+        
+        // If it's already a relative path (e.g., "userId/filename.pdf"), return as-is
+        return filePath;
     }
 }
