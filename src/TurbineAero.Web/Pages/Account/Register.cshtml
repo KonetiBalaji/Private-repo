@@ -157,7 +157,9 @@
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             // Constants
+            // Use API base URL if configured, otherwise use relative path (same origin)
             const API_BASE_URL = '@(Configuration["App:ApiBaseUrl"] ?? string.Empty)';
+            const API_URL = API_BASE_URL || '';
             
             // Toast utility function
             const showToast = (message, type = 'success') => {
@@ -459,7 +461,7 @@
                 setEmailStatus('Sending OTP...', 'info');
 
                 try {
-                    const response = await fetch(`${API_BASE_URL}/api/auth/register/send-email-otp`, {
+                    const response = await fetch(`${API_URL}/api/auth/register/send-email-otp`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -502,7 +504,7 @@
                 setOtpStatus('Verifying OTP...', 'info');
 
                 try {
-                    const response = await fetch(`${API_BASE_URL}/api/auth/register/verify-email-otp`, {
+                    const response = await fetch(`${API_URL}/api/auth/register/verify-email-otp`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'

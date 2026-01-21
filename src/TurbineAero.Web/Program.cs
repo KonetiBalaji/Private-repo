@@ -250,6 +250,112 @@ accountApi.MapPost("/disable-2fa", async (ClaimsPrincipal principal, UserManager
     return Results.Json(ApiResponse<object>.SuccessResult(new { success = true }, "Two-factor authentication disabled."));
 });
 
+// Registration endpoints (no authentication required)
+var registerApi = app.MapGroup("/api/auth/register");
+
+// Rate limiting storage for registration (in-memory, simple implementation)
+var registerOtpAttempts = new Dictionary<string, (int attempts, DateTime lockUntil)>();
+
+registerApi.MapPost("/send-email-otp", async ([FromBody] SendEmailOtpRequest request, UserManager<ApplicationUser> userManager, IOtpService otpService, IEmailService emailService, ApplicationDbContext context, IConfiguration configuration, ILogger<Program> logger) =>
+{
+    if (request == null || string.IsNullOrWhiteSpace(request.Email))
+    {
+        return Results.Json(ApiResponse<object>.ErrorResult("Email is required."), statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var email = request.Email.Trim().ToLowerInvariant();
+
+    // Check if user already exists
+    var existingUser = await userManager.FindByEmailAsync(email);
+    if (existingUser != null)
+    {
+        return Results.Json(ApiResponse<object>.ErrorResult("An account with this email already exists."), statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    // Check rate limiting
+    if (registerOtpAttempts.TryGetValue(email, out var attemptInfo))
+    {
+        if (attemptInfo.lockUntil > DateTime.UtcNow)
+        {
+            var remainingSeconds = (int)(attemptInfo.lockUntil - DateTime.UtcNow).TotalSeconds;
+            return Results.Json(ApiResponse<object>.ErrorResult($"Too many failed attempts. Please wait {remainingSeconds} seconds and try again."), statusCode: StatusCodes.Status429TooManyRequests);
+        }
+    }
+
+    // Check for recent OTP
+    var recentOtp = await context.OtpLogs
+        .Where(o => o.Identifier == email && o.OtpType == TurbineAero.Core.Interfaces.OtpType.Email.ToString())
+        .OrderByDescending(o => o.CreatedAt)
+        .FirstOrDefaultAsync();
+
+    if (recentOtp != null && !recentOtp.IsUsed)
+    {
+        var secondsSinceLastOtp = (DateTime.UtcNow - recentOtp.CreatedAt).TotalSeconds;
+        if (secondsSinceLastOtp < TurbineAero.Core.Constants.AppConstants.OtpResendCooldownSeconds)
+        {
+            var waitSeconds = Math.Max(1, TurbineAero.Core.Constants.AppConstants.OtpResendCooldownSeconds - (int)secondsSinceLastOtp);
+            return Results.Json(ApiResponse<object>.ErrorResult($"Please wait {waitSeconds} seconds before requesting a new OTP."), statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (recentOtp.ExpiresAt <= DateTime.UtcNow)
+        {
+            context.OtpLogs.Remove(recentOtp);
+            await context.SaveChangesAsync();
+        }
+    }
+
+    try
+    {
+        var code = await otpService.GenerateOtpAsync(email, TurbineAero.Core.Interfaces.OtpType.Email);
+        var sent = await emailService.SendOtpEmailAsync(email, code);
+
+        if (!sent)
+        {
+            var env = configuration["ASPNETCORE_ENVIRONMENT"];
+            if (!string.Equals(env, "Development", StringComparison.OrdinalIgnoreCase))
+            {
+                return Results.Json(ApiResponse<object>.ErrorResult("Failed to send OTP. Please try again."), statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            logger.LogWarning("OTP email send failed but continuing because environment is Development for {Email}", email);
+        }
+
+        return Results.Json(ApiResponse<object>.SuccessResult(new { }, "OTP sent successfully."));
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error sending email OTP for {Email}", email);
+        return Results.Json(ApiResponse<object>.ErrorResult("An error occurred while sending the OTP."), statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
+registerApi.MapPost("/verify-email-otp", async ([FromBody] VerifyEmailOtpRequest request, IOtpService otpService, ILogger<Program> logger) =>
+{
+    if (request == null || string.IsNullOrWhiteSpace(request.Email) || string.IsNullOrWhiteSpace(request.Otp))
+    {
+        return Results.Json(ApiResponse<object>.ErrorResult("Email and OTP are required."), statusCode: StatusCodes.Status400BadRequest);
+    }
+
+    var email = request.Email.Trim().ToLowerInvariant();
+    var otp = request.Otp.Trim().Replace(" ", "").Replace("-", "");
+
+    try
+    {
+        var verified = await otpService.VerifyOtpAsync(email, otp, TurbineAero.Core.Interfaces.OtpType.Email);
+        if (!verified)
+        {
+            return Results.Json(ApiResponse<object>.ErrorResult("Invalid OTP."), statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        return Results.Json(ApiResponse<object>.SuccessResult(new { }, "Email verified."));
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Error verifying email OTP for {Email}", email);
+        return Results.Json(ApiResponse<object>.ErrorResult("An error occurred during OTP verification."), statusCode: StatusCodes.Status500InternalServerError);
+    }
+});
+
 // Login 2FA endpoints (no authentication required)
 var login2FAApi = app.MapGroup("/api/auth/login-2fa");
 
